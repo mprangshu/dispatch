@@ -1,0 +1,5 @@
+# Runtime + dev dependencies (versions intentionally unpinned for now).
+chromadb        # local/persistent vector store: embeddings + metadata
+anthropic       # LLM client (configurable; default Claude per src/config.py MODEL)
+python-dotenv   # load API keys / settings from a .env file
+pytest          # test runner
