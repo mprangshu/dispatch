@@ -16,7 +16,7 @@ CHROMA_PATH = Path(__file__).resolve().parent.parent / ".chroma"
 TOP_K = 4
 
 # Models (configurable / swappable).
-MODEL = "claude-opus-4-8"
+MODEL = "gemini-2.5-flash"  # Google Gemini; LLM client reads GEMINI_API_KEY
 EMBEDDING_MODEL = "chroma-default"  # ChromaDB's built-in default embedding fn
 
 # TODO: add similarity/score thresholds (e.g. no-match and ambiguity cutoffs)

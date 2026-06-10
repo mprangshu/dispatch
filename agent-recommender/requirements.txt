@@ -1,6 +1,6 @@
 # Runtime + dev dependencies (versions intentionally unpinned for now).
 chromadb        # local/persistent vector store: embeddings + metadata
-anthropic       # LLM client (configurable; default Claude per src/config.py MODEL)
+google-genai    # LLM client (configurable; default Gemini per src/config.py MODEL)
 pyyaml          # parse agent `.md` frontmatter (lists: tags, autonomy_supported)
 python-dotenv   # load API keys / settings from a .env file
 pytest          # test runner

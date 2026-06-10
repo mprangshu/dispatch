@@ -7,32 +7,18 @@ See [PROBLEM_STATEMENT.md](../PROBLEM_STATEMENT.md) for the full spec.
 
 ## Setup / Run
 
-> Scaffold only — steps below are placeholders to fill in as the build
-> progresses (see PROBLEM_STATEMENT.md section 6).
-
-### Prerequisites
-
-- Python 3.11+
-
-### Setup
+Full step-by-step setup for cloners lives in [INSTALL.md](INSTALL.md). Quick
+version:
 
 ```bash
-# TODO: create a virtual environment, install dependencies, and configure the
-# LLM API key in a .env file.
-# python -m venv .venv
-# .venv\Scripts\activate            # Windows (PowerShell)
-# pip install -r requirements.txt
+python -m venv .venv
+.venv\Scripts\Activate.ps1          # Windows (PowerShell); use `source .venv/bin/activate` elsewhere
+pip install -r requirements.txt
+cp .env.example .env                 # then set GEMINI_API_KEY
+pytest                               # verify the install
 ```
 
-### Index the catalog
-
-```bash
-# TODO: (re)build the ChromaDB store from the agents/ directory.
-```
-
-### Run the chatbot
-
-```bash
-# TODO: start the CLI.
-# python app.py
-```
+> **Status:** Phase 1 (catalog loader + data model) is implemented and tested.
+> The indexer, retriever, router, and chatbot are still stubs — `app.py index`
+> and `app.py` are not runnable yet (see PROBLEM_STATEMENT.md section 6 for the
+> build order).
