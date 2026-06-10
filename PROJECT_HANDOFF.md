@@ -40,7 +40,7 @@ in that agent's doc. It must never invent facts.
 | **Phase 1** — `models.py` + `loader.py` + `tests/test_loader.py` | ✅ Done (tested) |
 | **Phase 2** — `index.py` + `retriever.py` + `tests/test_indexer.py` | ✅ Done (tested) |
 | **Phase 3** — Recommendation path (`recommender.py` + `llm.py` + `tests/test_recommender.py`) | ✅ Done (tested) |
-| Phase 4 — Intent router + RAG info path | ⬜ Not started |
+| **Phase 4** — Intent router (`router.py`) + RAG info path (`info.py`) + `tests/test_router.py` & `tests/test_info.py` | ✅ Done (tested) |
 | Phase 5 — Orchestration, CLI, integration tests | ⬜ Not started |
 | Deployment (hardware/software) fields in the docs | ⬜ Still `TBD` — being chased with manager |
 
@@ -56,7 +56,8 @@ agent-recommender/
 │   ├── retriever.py        # query ChromaDB               [Phase 2 — done]
 │   ├── recommender.py      # recommend(query) path        [Phase 3 — done]
 │   ├── llm.py              # swappable LLM (Gemini) client [Phase 3 — done]
-│   ├── router.py           # intent detection             [Phase 4]
+│   ├── router.py           # intent detection             [Phase 4 — done]
+│   ├── info.py             # answer_question(query) RAG    [Phase 4 — done]
 │   ├── chatbot.py          # orchestration                [Phase 5]
 │   └── config.py           # paths, model names, top_k, thresholds
 ├── tests/
@@ -230,7 +231,39 @@ match, an ambiguous case, and a metadata-filtered query. Run the tests and show
 results.
 ```
 
-### Phase 4 — Intent router + RAG info path
+### Phase 4 — Intent router + RAG info path ✅ DONE
+
+`src/router.py` and `src/info.py` are implemented and tested
+(`tests/test_router.py` + `tests/test_info.py` — 32 tests, all green offline).
+Notes for Phase 5 (the consumer):
+
+- **`detect_intent(query)` contract is live** exactly as in section 7:
+  `detect_intent(query) -> "recommend" | "info" | "clarify"`. Rule-based and
+  deterministic by default, with an optional LLM pass (`use_llm=True`, the
+  default) that falls back to the rules whenever the LLM is unavailable or
+  returns anything other than the three labels. Empty/very-short/vague messages
+  classify as `clarify`. Pass `use_llm=False` for deterministic behavior.
+- **`answer_question(query)` contract is live** exactly as in section 7:
+  `answer_question(query) -> {"answer": str, "sources": list[Hit], "grounded": bool}`.
+  It identifies the agent via `router.find_agent` (catalog-driven, no hard-coded
+  names) or falls back to retrieval, maps the question to a section header
+  (`detect_section`), scopes `search_sections` with a `where` filter, and widens
+  the filter if a tight one returns nothing.
+- **Grounding gate (§4.4/§8):** when the relevant section has no real content —
+  Deployment `TBD`, or "Not specified in source" — it returns `grounded=False`
+  with an honest "I don't have that information" and never fabricates. Phase 5
+  can surface `grounded` directly in the reply.
+- **Extra keyword-only args for callers/tests:** `answer_question(query, *,
+  k=None, use_llm=True, search_fn=None)` and `detect_intent(query, *,
+  use_llm=True)`. `search_fn` is injectable (defaults to
+  `retriever.search_sections`) so dependencies can be stubbed against §7.
+- **Reuses `src/llm.py`** (the Phase 3 wrapper) for both the optional intent
+  pass and grounded answer generation — no second LLM client, as agreed.
+- **New file — `src/info.py`:** the info/RAG path lives here, mirroring how the
+  recommendation path lives in `recommender.py`. `chatbot.py` should import
+  `answer_question` from `src.info` and `detect_intent` from `src.router`.
+
+The original kickoff prompt (kept for reference):
 ```
 Read PROBLEM_STATEMENT.md and PROJECT_HANDOFF.md. Implement router.py and the
 RAG info path ONLY. detect_intent(query) returns "recommend" | "info" | "clarify"

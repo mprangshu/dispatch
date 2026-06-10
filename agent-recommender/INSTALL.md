@@ -3,12 +3,13 @@
 How to get the **Agent Recommender & Q&A Chatbot** running after cloning from
 GitHub.
 
-> **Project status:** Phases 1–3 are implemented and tested — the catalog
-> loader + data model (Phase 1), the ChromaDB indexer + retriever (Phase 2), and
-> the recommendation path (Phase 3, `src/recommender.py`). The catalog can be
-> indexed today with `python -m src.index`. The router and chatbot are still
-> stubs, so the `app.py` REPL isn't runnable yet. Steps marked _(coming soon)_
-> describe the intended workflow and don't work yet.
+> **Project status:** Phases 1–4 are implemented and tested — the catalog
+> loader + data model (Phase 1), the ChromaDB indexer + retriever (Phase 2), the
+> recommendation path (Phase 3, `src/recommender.py`), and the intent router +
+> RAG info path (Phase 4, `src/router.py` + `src/info.py`). The catalog can be
+> indexed today with `python -m src.index`. The chatbot orchestration and CLI are
+> still stubs, so the `app.py` REPL isn't runnable yet. Steps marked
+> _(coming soon)_ describe the intended workflow and don't work yet.
 
 ---
 
@@ -94,12 +95,14 @@ explanations.)
 pytest
 ```
 
-You should see the suite pass (27 passed). These run against the real agent
+You should see the suite pass (59 passed). These run against the real agent
 files in `agents/` — the loader tests confirm the catalog parses correctly, the
-indexer/retriever tests build a throwaway ChromaDB store and query it, and the
+indexer/retriever tests build a throwaway ChromaDB store and query it, the
 recommender tests check the recommendation path (clear match, ambiguous
-shortlist, metadata-filtered query, and no-match) — so a green run confirms the
-install, the catalog, the vector store, and the recommendation logic all work.
+shortlist, metadata-filtered query, and no-match), and the router/info tests
+check intent classification and the grounded RAG answers (including the honest
+"I don't have that" for `TBD` fields) — so a green run confirms the install, the
+catalog, the vector store, and the recommendation/info logic all work.
 
 > The first run downloads the default embedding model (a few tens of MB) and can
 > take ~1 minute; subsequent runs are fast.
