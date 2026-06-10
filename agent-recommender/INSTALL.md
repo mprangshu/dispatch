@@ -3,11 +3,12 @@
 How to get the **Agent Recommender & Q&A Chatbot** running after cloning from
 GitHub.
 
-> **Project status:** Phases 1–2 are implemented and tested — the catalog
-> loader + data model (Phase 1) and the ChromaDB indexer + retriever (Phase 2).
-> The catalog can be indexed today with `python -m src.index`. The router and
-> chatbot are still stubs, so the `app.py` REPL isn't runnable yet. Steps marked
-> _(coming soon)_ describe the intended workflow and don't work yet.
+> **Project status:** Phases 1–3 are implemented and tested — the catalog
+> loader + data model (Phase 1), the ChromaDB indexer + retriever (Phase 2), and
+> the recommendation path (Phase 3, `src/recommender.py`). The catalog can be
+> indexed today with `python -m src.index`. The router and chatbot are still
+> stubs, so the `app.py` REPL isn't runnable yet. Steps marked _(coming soon)_
+> describe the intended workflow and don't work yet.
 
 ---
 
@@ -15,9 +16,10 @@ GitHub.
 
 - **Python 3.11 or newer** — check with `python --version`.
 - **git** — to clone the repository.
-- An **LLM API key** (Google Gemini by default) — only needed for the chatbot
-  paths, not for the loader/tests. Get one at
-  <https://aistudio.google.com/apikey>.
+- An **LLM API key** (Google Gemini by default) — used for LLM-generated
+  recommendation explanations and (later) the chatbot paths. Optional: the
+  recommender falls back to a deterministic explanation without it, and the
+  loader/tests don't need it. Get one at <https://aistudio.google.com/apikey>.
 
 ## 2. Clone the repository
 
@@ -83,7 +85,8 @@ cp .env.example .env
 
 Then open `.env` and set `GEMINI_API_KEY` to your key. `.env` is gitignored,
 so your secret never gets committed. (You can skip this step if you only want to
-run the loader and tests.)
+run the loader/tests or use the recommender with its deterministic fallback
+explanations.)
 
 ## 6. Verify the install — run the tests
 
@@ -91,10 +94,12 @@ run the loader and tests.)
 pytest
 ```
 
-You should see the suite pass (17 passed). These run against the real agent
-files in `agents/` — the loader tests confirm the catalog parses correctly, and
-the indexer/retriever tests build a throwaway ChromaDB store and query it, so a
-green run confirms the install, the catalog, and the vector store all work.
+You should see the suite pass (27 passed). These run against the real agent
+files in `agents/` — the loader tests confirm the catalog parses correctly, the
+indexer/retriever tests build a throwaway ChromaDB store and query it, and the
+recommender tests check the recommendation path (clear match, ambiguous
+shortlist, metadata-filtered query, and no-match) — so a green run confirms the
+install, the catalog, the vector store, and the recommendation logic all work.
 
 > The first run downloads the default embedding model (a few tens of MB) and can
 > take ~1 minute; subsequent runs are fast.
