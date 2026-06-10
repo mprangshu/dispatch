@@ -2,9 +2,11 @@
 
 > **This file is the behavior spec — the source of truth for *what* the system
 > should do — and is kept stable.** For *build status*, see
-> [`PROJECT_HANDOFF.md`](PROJECT_HANDOFF.md); for an orientation/walkthrough, see
-> [`ONBOARDING.md`](ONBOARDING.md). As of now the implementation is **complete
-> (Phases 1–5, 68 tests passing)** and every acceptance criterion in §9 is met.
+> [`PROJECT_HANDOFF_v2.md`](PROJECT_HANDOFF_v2.md); for an orientation/walkthrough,
+> see [`ONBOARDING.md`](ONBOARDING.md). As of now the core is **complete (Phases
+> 1–7, 84 tests passing)** — the LLM is verified live (Phase 6) and a FastAPI
+> backend is in place (Phase 7), with a Streamlit UI (Phase 8) still to come — and
+> every acceptance criterion in §9 is met.
 
 ## 1. Goal
 

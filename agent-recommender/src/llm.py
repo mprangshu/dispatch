@@ -62,7 +62,7 @@ def generate(prompt: str, system: str | None = None, model: str | None = None) -
     try:
         from google.genai import types
 
-        cfg = types.GenerateContentConfig(temperature=0.2)
+        cfg = types.GenerateContentConfig(temperature=0.5)
         if system:
             cfg.system_instruction = system
         response = client.models.generate_content(

@@ -22,9 +22,11 @@ single entry point in PROJECT_HANDOFF.md section 7:
      section 8) rather than inventing anything.
 
 The path functions and the router are module-level names so the orchestration
-can be unit-tested by stubbing them, and every path threads ``use_llm`` through
-so the whole chatbot runs deterministically offline (the LLM degrades to the
-grounded fallbacks). The CLI in ``app.py`` is a thin shell over ``handle``.
+can be unit-tested by stubbing them. Intent detection always uses the
+deterministic router; ``use_llm`` is threaded into the recommend/info paths only
+(answer + explanation generation), so the whole chatbot still runs
+deterministically offline (the LLM degrades to the grounded fallbacks). The CLI
+in ``app.py`` is a thin shell over ``handle``.
 """
 
 from __future__ import annotations
@@ -113,15 +115,20 @@ def _clarify_reply() -> str:
 def handle(message: str, *, use_llm: bool = True) -> str:
     """Detect intent, route to the matching path, and format a grounded reply.
 
-    ``use_llm`` is threaded through to every path so the whole chatbot can run
-    deterministically offline (each path falls back to its grounded, rule-based
-    behavior when the LLM is unavailable).
+    Intent is classified by the deterministic router (no API call). ``use_llm``
+    is passed to the recommend/info paths for answer/explanation generation, and
+    each falls back to its grounded, rule-based behavior when the LLM is
+    unavailable, so the whole chatbot can still run deterministically offline.
     """
     text = (message or "").strip()
     if not text:
         return _clarify_reply()
 
-    intent = detect_intent(text, use_llm=use_llm)
+    # Intent detection always uses the deterministic router — it's accurate on
+    # the catalog's phrasing and costs no API call. ``use_llm`` is reserved for
+    # the answer/explanation generation in the paths below, which halves the
+    # number of LLM calls per message.
+    intent = detect_intent(text)
 
     if intent == "recommend":
         return _format_recommendation(recommend(text, use_llm=use_llm))

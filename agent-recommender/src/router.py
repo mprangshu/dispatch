@@ -160,12 +160,14 @@ def _classify_llm(text: str) -> str | None:
     return label if label in _VALID else None
 
 
-def detect_intent(query: str, *, use_llm: bool = True) -> str:
+def detect_intent(query: str, *, use_llm: bool = False) -> str:
     """Classify ``query`` as ``recommend`` | ``info`` | ``clarify``.
 
-    Rules are the reliable default. With ``use_llm=True`` (and an LLM
-    configured) an LLM pass runs first, but its result is only trusted when it's
-    one of the three valid labels; otherwise the rules decide.
+    The deterministic rules are the default (``use_llm=False``): they're fast,
+    free, offline, and accurate on the catalog's phrasing, so intent detection
+    costs no API calls. Pass ``use_llm=True`` to opt into an LLM pass in front
+    for fuzzier wording; even then its result is only trusted when it's one of
+    the three valid labels, otherwise the rules decide.
     """
     text = (query or "").strip()
     if not text:

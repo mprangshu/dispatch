@@ -1,5 +1,12 @@
 # Project Handoff & Onboarding — Agent Recommender & Q&A Chatbot
 
+> ⚠️ **Superseded for current state by [`PROJECT_HANDOFF_v2.md`](PROJECT_HANDOFF_v2.md).**
+> This file records the original build (Phases 1–5) and its interface contracts,
+> which are still accurate. For the latest status — Phase 6 (LLM verified),
+> Phase 7 (FastAPI backend), the 84-test suite, and Phase 8 (Streamlit, pending)
+> — read v2. The contracts in §7 below remain the agreed signatures (note:
+> `detect_intent` now defaults to `use_llm=False`).
+
 > Read this **together with `PROBLEM_STATEMENT.md`**. That file is the detailed
 > spec (the source of truth for behavior). *This* file is the team-facing layer:
 > current state, who owns what, the interface contracts that let us work in
@@ -32,9 +39,12 @@ in that agent's doc. It must never invent facts.
 
 ## 3. Current state — all phases complete ✅
 
-**The build is done: Phases 1–5 are implemented and tested (68 passing).** The
-chatbot is runnable end to end — `python app.py index` then `python app.py`. The
-only open item is data (the `TBD` Deployment fields), not code.
+**The core build is done: Phases 1–5 are implemented and tested.** The chatbot is
+runnable end to end — `python app.py index` then `python app.py`. _(Current state
+has since advanced — the LLM is verified live (Phase 6) and a FastAPI backend
+exists (Phase 7), with the suite now at **84 passing**; see
+[`PROJECT_HANDOFF_v2.md`](PROJECT_HANDOFF_v2.md). The table below reflects the
+Phase 1–5 build.)_ The only open data item is the `TBD` Deployment fields.
 
 | Item | Status |
 |------|--------|

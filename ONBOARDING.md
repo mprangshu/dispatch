@@ -24,18 +24,24 @@ grounded **strictly** in those files (it never invents facts):
    Provisioning's inputs?") and it answers from that agent's doc, or honestly
    says *"I don't have that information"* when the doc says `TBD`.
 
-**Status: complete (Phases 1–5), 68 tests passing.** Runnable today:
+**Status: backend complete (Phases 1–7), 84 tests passing.** The LLM is
+activated and verified live against Gemini (Phase 6), and a FastAPI backend
+(Phase 7) exposes the core over HTTP. Phase 8 — a Streamlit UI over the API — is
+the only piece left. Runnable today:
 
 ```bash
 cd agent-recommender
 python -m venv .venv && .venv\Scripts\Activate.ps1   # see INSTALL.md for other OSes
 pip install -r requirements.txt
 python app.py index      # build the vector store from agents/
-python app.py            # chat
+python app.py            # chat (CLI)
+uvicorn api:app --port 8000   # optional: serve the same core over HTTP (docs at /docs)
 ```
 
 No API key is required to run it — every LLM call has a deterministic, grounded
 fallback (set `GEMINI_API_KEY` in `.env` to get LLM-written prose instead).
+Intent detection always uses the deterministic router, so each chat turn makes
+at most **one** LLM call (the answer/explanation), not two.
 
 ---
 
@@ -90,8 +96,10 @@ All code lives under [`agent-recommender/`](agent-recommender/).
 | [`src/info.py`](agent-recommender/src/info.py) | `answer_question(query)` RAG + grounding gate | 4 |
 | [`src/chatbot.py`](agent-recommender/src/chatbot.py) | `handle(message)` — intent → route → formatted reply | 5 |
 | [`app.py`](agent-recommender/app.py) | CLI: `index` subcommand + chat REPL | 5 |
+| [`scripts/verify_llm.py`](agent-recommender/scripts/verify_llm.py) | Manual LLM on/off A/B over three queries (hits the real API) | 6 |
+| [`api.py`](agent-recommender/api.py) | FastAPI backend: `POST /chat`, `GET /agents`, `GET /health` over `src.handle` | 7 |
 | [`src/config.py`](agent-recommender/src/config.py) | Paths, model names, `TOP_K`, thresholds | — |
-| [`tests/`](agent-recommender/tests/) | One `test_*.py` per module + `test_chatbot.py` (end-to-end) | all |
+| [`tests/`](agent-recommender/tests/) | One `test_*.py` per module + `test_chatbot.py` (E2E), `test_llm.py` (mocked LLM guardrails), `test_api.py` (HTTP) | all |
 
 `from src import handle, recommend, answer_question, detect_intent, build_index`
 is the public import surface.
@@ -118,7 +126,7 @@ search_sections(query, k=5, where=None) -> list[Hit]
 # Paths
 recommend(query, *, k=None, use_llm=True, search_fn=None)
     -> {"agents": list[Hit], "explanation": str, "ambiguous": bool}
-detect_intent(query, *, use_llm=True)
+detect_intent(query, *, use_llm=False)   # deterministic router by default
     -> "recommend" | "info" | "clarify"
 answer_question(query, *, k=None, use_llm=True, search_fn=None)
     -> {"answer": str, "sources": list[Hit], "grounded": bool}
@@ -138,9 +146,11 @@ handle(message, *, use_llm=True) -> str
 
 ```bash
 cd agent-recommender
-pytest                 # 68 passed — runs against the real agents/ catalog
+pytest                 # 84 passed — runs against the real agents/ catalog
 python app.py index    # (re)build .chroma/ from agents/  (gitignored)
 python app.py          # REPL: describe a task, or ask about an agent; 'exit' to quit
+uvicorn api:app --port 8000   # optional: HTTP API (POST /chat, GET /agents, GET /health)
+python scripts/verify_llm.py  # optional: LLM on/off A/B (needs a key + a built store)
 ```
 
 - **First run is slow (~1 min)**: ChromaDB downloads its default embedding model
@@ -165,7 +175,7 @@ The architecture was built to grow. Common changes and where to make them:
 | **Swap the embedding model** | Change `index.get_embedding_function()` (one function) and re-index | retriever, paths |
 | **Swap the LLM** | Reimplement `src/llm.py`'s `generate()`/`available()`; keep the signatures | every caller (they only use `generate`) |
 | **Tune recommendation behavior** | `config.py`: `RECOMMEND_TOP_K`, `NO_MATCH_SCORE`, `AMBIGUITY_DELTA` | logic |
-| **Add a web/API front end** | New module that imports `handle` from `src` — the core is interface-decoupled by design (`PROBLEM_STATEMENT.md` §7) | `src/` core |
+| **Use / extend the web API** | The FastAPI backend already exists in `api.py` (Phase 7), importing `handle` from `src`; add endpoints there. A Streamlit UI over it is Phase 8 | `src/` core |
 | **Recognize new intents/sections** | Extend the regexes in `router.py` / `info.py` (`_SECTION_PATTERNS`); keep the rule-based fallback deterministic | contracts |
 
 **House rules for any contributor (human or AI):**
@@ -192,6 +202,11 @@ The architecture was built to grow. Common changes and where to make them:
 - **No key set?** That's fine — explanations/answers come from the grounded
   fallbacks (verbatim section text, template explanations). Set `GEMINI_API_KEY`
   for LLM-written prose.
+- **Free-tier rate limits (HTTP 429):** Gemini's free tier caps requests per
+  minute/day. When exhausted, `llm.generate()` returns `None` and the path falls
+  back to its deterministic answer — so a "live" reply can silently look like the
+  offline one. It's not a bug; wait for the window to reset or use a higher-limit
+  key. Each chat turn makes at most one LLM call (intent is deterministic).
 
 ---
 

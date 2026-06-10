@@ -3,13 +3,16 @@
 How to get the **Agent Recommender & Q&A Chatbot** running after cloning from
 GitHub.
 
-> **Project status: complete (Phases 1–5), all 68 tests passing.** The catalog
-> loader + data model (Phase 1), the ChromaDB indexer + retriever (Phase 2), the
-> recommendation path (Phase 3, `src/recommender.py`), the intent router + RAG
-> info path (Phase 4, `src/router.py` + `src/info.py`), and the orchestration +
-> CLI (Phase 5, `src/chatbot.py` + `app.py`) are all implemented and tested. The
-> chatbot is runnable end to end — index with `python app.py index`, then chat
-> with `python app.py`.
+> **Project status: backend complete (Phases 1–7), all 84 tests passing.** The
+> catalog loader + data model (Phase 1), the ChromaDB indexer + retriever
+> (Phase 2), the recommendation path (Phase 3, `src/recommender.py`), the intent
+> router + RAG info path (Phase 4, `src/router.py` + `src/info.py`), the
+> orchestration + CLI (Phase 5, `src/chatbot.py` + `app.py`), the live-LLM
+> activation/verification (Phase 6, `scripts/verify_llm.py` + `tests/test_llm.py`),
+> and the FastAPI backend (Phase 7, `api.py`) are all implemented and tested. The
+> chatbot is runnable end to end as a CLI (`python app.py index`, then
+> `python app.py`) and over HTTP (`uvicorn api:app --port 8000`). Phase 8 — a
+> Streamlit UI over the API — is the only remaining piece.
 
 ---
 
@@ -72,8 +75,9 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-This installs `chromadb`, `google-genai`, `pyyaml`, `python-dotenv`, and
-`pytest`.
+This installs `chromadb`, `google-genai`, `pyyaml`, `python-dotenv`, `fastapi`,
+`uvicorn[standard]` (the HTTP backend), `pytest`, and `httpx` (used by the API
+tests).
 
 ## 5. Configure your API key
 
@@ -96,17 +100,19 @@ explanations.)
 pytest
 ```
 
-You should see the suite pass (68 passed). These run against the real agent
+You should see the suite pass (84 passed). These run against the real agent
 files in `agents/` — the loader tests confirm the catalog parses correctly, the
 indexer/retriever tests build a throwaway ChromaDB store and query it, the
 recommender tests check the recommendation path (clear match, ambiguous
 shortlist, metadata-filtered query, and no-match), the router/info tests check
 intent classification and the grounded RAG answers (including the honest "I
-don't have that" for `TBD` fields), and the chatbot tests drive `handle()` end
-to end across every acceptance criterion (recommendation, grounded answer,
-honest "not available", vague→clarify, and new-agent discoverability after
-re-indexing) — so a green run confirms the install, the catalog, the vector
-store, and the full recommendation/info/orchestration logic all work.
+don't have that" for `TBD` fields), the chatbot tests drive `handle()` end to
+end across every acceptance criterion (recommendation, grounded answer, honest
+"not available", vague→clarify, and new-agent discoverability after re-indexing),
+the LLM guardrail tests (mocked, so no key needed) prove the grounding gate holds
+even with the LLM on, and the API tests exercise the FastAPI endpoints — so a
+green run confirms the install, the catalog, the vector store, the full
+recommendation/info/orchestration logic, and the HTTP layer all work.
 
 > The first run downloads the default embedding model (a few tens of MB) and can
 > take ~1 minute; subsequent runs are fast.
@@ -149,6 +155,22 @@ you> What hardware does the User Story Analyser need?
 I don't have that information. … it's currently marked TBD / not specified.
 ```
 
+## 9. Run the HTTP API (optional)
+
+The same core is exposed over HTTP by the FastAPI backend in `api.py` — useful
+for a web/UI front end (Phase 8) or any external caller. Index first (step 7),
+then:
+
+```bash
+uvicorn api:app --reload --port 8000
+```
+
+Endpoints (interactive docs at <http://localhost:8000/docs>):
+
+- `POST /chat` — body `{ "message": "...", "use_llm": true }` → `{ "reply": "..." }`
+- `GET /agents` — the live catalog as JSON
+- `GET /health` — `{ "status": "ok", "llm_available": true|false }`
+
 ---
 
 ## Troubleshooting
@@ -160,6 +182,8 @@ I don't have that information. … it's currently marked TBD / not specified.
 | PowerShell won't run `Activate.ps1` | `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`, then re-activate. |
 | `pytest` runs against system Python | Activate the venv first, or call `python -m pytest`. |
 | API key errors when running the chatbot | Confirm `.env` exists and `GEMINI_API_KEY` is set (step 5). |
+| LLM answers silently look like the offline fallback | The free-tier Gemini quota may be exhausted (HTTP 429); the wrapper falls back automatically. Wait for the quota window to reset or use a key with higher limits. |
+| `uvicorn`/`fastapi` not found | Re-run `pip install -r requirements.txt` with the venv active (step 4). |
 
 See [PROBLEM_STATEMENT.md](../PROBLEM_STATEMENT.md) for the full specification
 and [README.md](README.md) for a project overview.

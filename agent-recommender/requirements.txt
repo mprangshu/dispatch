@@ -3,4 +3,7 @@ chromadb        # local/persistent vector store: embeddings + metadata
 google-genai    # LLM client (configurable; default Gemini per src/config.py MODEL)
 pyyaml          # parse agent `.md` frontmatter (lists: tags, autonomy_supported)
 python-dotenv   # load API keys / settings from a .env file
+fastapi             # HTTP backend (Phase 7) wrapping the chatbot core
+uvicorn[standard]   # ASGI server to run the FastAPI app
 pytest          # test runner
+httpx           # required by FastAPI's TestClient (API tests)
