@@ -3,7 +3,7 @@
 How to get the **Agent Recommender & Q&A Chatbot** running after cloning from
 GitHub.
 
-> **Project status: backend complete (Phases 1–7), all 84 tests passing.** The
+> **Project status: complete (Phases 1–8), all 95 tests passing.** The
 > catalog loader + data model (Phase 1), the ChromaDB indexer + retriever
 > (Phase 2), the recommendation path (Phase 3, `src/recommender.py`), the intent
 > router + RAG info path (Phase 4, `src/router.py` + `src/info.py`), the
@@ -12,7 +12,8 @@ GitHub.
 > and the FastAPI backend (Phase 7, `api.py`) are all implemented and tested. The
 > chatbot is runnable end to end as a CLI (`python app.py index`, then
 > `python app.py`) and over HTTP (`uvicorn api:app --port 8000`). Phase 8 — a
-> Streamlit UI over the API — is the only remaining piece.
+> Streamlit UI over the API — now ships in `frontend/` (see step 10), bringing the
+> project to **complete (Phases 1–8), 95 tests passing**.
 
 ---
 
@@ -100,7 +101,7 @@ explanations.)
 pytest
 ```
 
-You should see the suite pass (84 passed). These run against the real agent
+You should see the suite pass (95 passed). These run against the real agent
 files in `agents/` — the loader tests confirm the catalog parses correctly, the
 indexer/retriever tests build a throwaway ChromaDB store and query it, the
 recommender tests check the recommendation path (clear match, ambiguous
@@ -110,9 +111,11 @@ don't have that" for `TBD` fields), the chatbot tests drive `handle()` end to
 end across every acceptance criterion (recommendation, grounded answer, honest
 "not available", vague→clarify, and new-agent discoverability after re-indexing),
 the LLM guardrail tests (mocked, so no key needed) prove the grounding gate holds
-even with the LLM on, and the API tests exercise the FastAPI endpoints — so a
-green run confirms the install, the catalog, the vector store, the full
-recommendation/info/orchestration logic, and the HTTP layer all work.
+even with the LLM on, the API tests exercise the FastAPI endpoints, and the
+frontend tests (`frontend/tests/test_ui.py`, with the HTTP layer mocked) check
+the UI's API client — so a green run confirms the install, the catalog, the
+vector store, the full recommendation/info/orchestration logic, the HTTP layer,
+and the frontend client all work.
 
 > The first run downloads the default embedding model (a few tens of MB) and can
 > take ~1 minute; subsequent runs are fast.
@@ -158,8 +161,7 @@ I don't have that information. … it's currently marked TBD / not specified.
 ## 9. Run the HTTP API (optional)
 
 The same core is exposed over HTTP by the FastAPI backend in `api.py` — useful
-for a web/UI front end (Phase 8) or any external caller. Index first (step 7),
-then:
+for the web UI (step 10) or any external caller. Index first (step 7), then:
 
 ```bash
 uvicorn api:app --reload --port 8000
@@ -170,6 +172,27 @@ Endpoints (interactive docs at <http://localhost:8000/docs>):
 - `POST /chat` — body `{ "message": "...", "use_llm": true }` → `{ "reply": "..." }`
 - `GET /agents` — the live catalog as JSON
 - `GET /health` — `{ "status": "ok", "llm_available": true|false }`
+
+## 10. Run the web UI (optional)
+
+A Streamlit chat UI over the API ships in `frontend/` (Phase 8). It's a thin HTTP
+client and doesn't import the core, so it has its own small dependency set. Two
+terminals, from `agent-recommender/`:
+
+```bash
+# Terminal 1 — backend (must be running first)
+uvicorn api:app --port 8000
+
+# Terminal 2 — frontend
+cd frontend
+pip install -r requirements.txt
+streamlit run app_ui.py
+```
+
+The UI opens at <http://localhost:8501>. The sidebar shows a backend health
+indicator, lists the live catalog, and has a configurable API URL; if the backend
+is down it shows how to start it rather than crashing. See
+[frontend/README.md](frontend/README.md) for details.
 
 ---
 

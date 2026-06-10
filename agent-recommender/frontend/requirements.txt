@@ -1,0 +1,5 @@
+# Frontend-only dependencies (Phase 8 Streamlit UI).
+# The UI is a thin HTTP client over the FastAPI backend; it does NOT import the
+# `src` core, so it needs nothing from the backend's requirements.txt.
+streamlit   # the chat UI (rendering + session state)
+requests    # HTTP calls to the FastAPI backend (POST /chat, GET /agents, /health)

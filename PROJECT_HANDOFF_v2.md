@@ -18,9 +18,10 @@ The core product is **done**: Phases 1–5 are complete and the suite now has
 **84 tests passing**. It runs today as a CLI chatbot over the agent catalog,
 with two paths (recommend / info) grounded strictly in the agent `.md` files.
 
-> **Progress update:** Phases **6 (LLM activate + verify)** and **7 (FastAPI
-> backend)** described below are now **complete and tested**. Only **Phase 8
-> (Streamlit frontend)** remains.
+> **Progress update:** Phases **6 (LLM activate + verify)**, **7 (FastAPI
+> backend)**, and **8 (Streamlit frontend)** described below are now **complete
+> and tested** — the suite is at **95 passing**. The frontend ships in
+> `agent-recommender/frontend/` (see §9 and §11).
 
 What was left is **not new core logic** — it's three things:
 
@@ -45,14 +46,14 @@ What was left is **not new core logic** — it's three things:
 | Area | State |
 |------|-------|
 | Phases 1–5 (model, loader, indexer, retriever, recommender, router, info, chatbot, CLI) | ✅ Complete |
-| Test suite | ✅ 84 passing (deterministic/mocked; CI needs no key) |
+| Test suite | ✅ 95 passing (deterministic/mocked; CI needs no key) |
 | CLI | ✅ Runnable: `python app.py index` then `python app.py` |
 | `src/llm.py` Gemini wrapper (`generate()`/`available()`) | ✅ Exists; returns `None` on any failure → callers fall back |
 | `GEMINI_API_KEY` | ✅ In `.env` (gitignored) |
 | **Live LLM path exercised end-to-end** | ✅ **Done (Phase 6)** — verified live via `scripts/verify_llm.py`; mocked guardrail tests in `tests/test_llm.py` |
 | Intent detection | ✅ Deterministic by default — `handle()` makes ≤1 LLM call per turn |
 | FastAPI backend | ✅ **Done (Phase 7)** — `api.py`: `POST /chat`, `GET /agents`, `GET /health`; tests in `tests/test_api.py` |
-| Streamlit frontend | ⬜ Not started (Phase 8) |
+| Streamlit frontend | ✅ **Done (Phase 8)** — `frontend/` (`app_ui.py` + `api_client.py`) over the API; tests in `frontend/tests/test_ui.py` |
 | Deployment (hardware/software) doc fields | ⬜ Still `TBD` — info path correctly answers "not available" until filled |
 
 ---
@@ -66,7 +67,8 @@ pip install -r requirements.txt
 python app.py index      # build .chroma/ from agents/   (first run ~1 min: downloads embedding model)
 python app.py            # chat REPL; 'exit' to quit
 uvicorn api:app --port 8000   # optional: HTTP backend (Phase 7)
-pytest                   # 84 passed
+cd frontend && pip install -r requirements.txt && streamlit run app_ui.py   # optional: web UI (Phase 8)
+pytest                   # 95 passed
 ```
 
 - **No key needed** to run — grounded deterministic fallbacks cover every LLM
@@ -137,7 +139,7 @@ Phase 6  Activate + verify the LLM   ✅ DONE  (verify_llm.py + mocked guardrail
 Phase 7  FastAPI backend             ✅ DONE  (api.py; no core changes)
             │
             ▼
-Phase 8  Streamlit frontend          ⬜ TODO  (chat UI calling the FastAPI backend)
+Phase 8  Streamlit frontend          ✅ DONE  (frontend/ chat UI calling the API)
             ▼
          Demo-ready (see §10 runbook)
 ```
@@ -287,7 +289,21 @@ Run pytest and show results, and print the exact uvicorn command to start it.
 
 ---
 
-## 9. Phase 8 — Streamlit frontend
+## 9. Phase 8 — Streamlit frontend ✅ DONE
+
+> **Completed.** The UI shipped as a **self-contained `frontend/` folder** rather
+> than a single root `streamlit_app.py` — the HTTP logic is isolated in
+> `frontend/api_client.py` (no Streamlit import) so it can be unit-tested without
+> a live server, and `frontend/app_ui.py` holds only rendering + session state.
+> All HTTP calls go through `api_client` and fail soft (returning an error the UI
+> shows via `st.error`, never crashing). Sidebar has the agent list, a health
+> indicator, a configurable API base URL, a `use_llm` toggle, and Clear-chat;
+> plus one-click example prompts for the recommend / info / missing-data cases.
+> Tests: `frontend/tests/test_ui.py` (11, HTTP mocked — normal reply, API-down,
+> non-200, timeout). `streamlit` + `requests` are in `frontend/requirements.txt`.
+> Run: terminal 1 `uvicorn api:app --port 8000`; terminal 2
+> `cd frontend && pip install -r requirements.txt && streamlit run app_ui.py`.
+> The brief below is kept as the original scope.
 
 **Goal.** A simple chat UI for the user demo that talks to the FastAPI backend.
 Keep the layers separate (Streamlit → FastAPI → `src.handle`) so the UI can be
@@ -341,7 +357,8 @@ python app.py index            # only if .chroma/ isn't built yet
 uvicorn api:app --port 8000
 
 # Terminal 2 — frontend
-streamlit run streamlit_app.py
+cd frontend && pip install -r requirements.txt
+streamlit run app_ui.py
 ```
 
 What to show the audience:
@@ -361,7 +378,12 @@ What to show the audience:
 ```
 agent-recommender/
 ├── api.py                  # ✅ (Phase 7) FastAPI backend over src.handle
-├── streamlit_app.py        # ⬜ (Phase 8) chat UI calling the API — TODO
+├── frontend/               # ✅ (Phase 8) Streamlit chat UI over the API (no src import)
+│   ├── app_ui.py           #   rendering + session state
+│   ├── api_client.py       #   thin HTTP wrapper (unit-tested, no Streamlit import)
+│   ├── requirements.txt    #   streamlit, requests
+│   ├── README.md           #   how to run the UI
+│   └── tests/test_ui.py    #   HTTP-mocked client tests
 ├── scripts/
 │   └── verify_llm.py       # ✅ (Phase 6) LLM on/off A/B printout
 ├── app.py                  # unchanged CLI

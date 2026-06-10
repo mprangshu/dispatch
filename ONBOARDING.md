@@ -24,10 +24,11 @@ grounded **strictly** in those files (it never invents facts):
    Provisioning's inputs?") and it answers from that agent's doc, or honestly
    says *"I don't have that information"* when the doc says `TBD`.
 
-**Status: backend complete (Phases 1–7), 84 tests passing.** The LLM is
-activated and verified live against Gemini (Phase 6), and a FastAPI backend
-(Phase 7) exposes the core over HTTP. Phase 8 — a Streamlit UI over the API — is
-the only piece left. Runnable today:
+**Status: complete (Phases 1–8), 95 tests passing.** The LLM is activated and
+verified live against Gemini (Phase 6), a FastAPI backend (Phase 7) exposes the
+core over HTTP, and a Streamlit chat UI over that backend ships in
+[`agent-recommender/frontend/`](agent-recommender/frontend/) (Phase 8). Runnable
+today:
 
 ```bash
 cd agent-recommender
@@ -36,6 +37,9 @@ pip install -r requirements.txt
 python app.py index      # build the vector store from agents/
 python app.py            # chat (CLI)
 uvicorn api:app --port 8000   # optional: serve the same core over HTTP (docs at /docs)
+
+# optional: a browser chat UI over the API (see frontend/README.md)
+cd frontend && pip install -r requirements.txt && streamlit run app_ui.py
 ```
 
 No API key is required to run it — every LLM call has a deterministic, grounded
@@ -98,8 +102,9 @@ All code lives under [`agent-recommender/`](agent-recommender/).
 | [`app.py`](agent-recommender/app.py) | CLI: `index` subcommand + chat REPL | 5 |
 | [`scripts/verify_llm.py`](agent-recommender/scripts/verify_llm.py) | Manual LLM on/off A/B over three queries (hits the real API) | 6 |
 | [`api.py`](agent-recommender/api.py) | FastAPI backend: `POST /chat`, `GET /agents`, `GET /health` over `src.handle` | 7 |
+| [`frontend/`](agent-recommender/frontend/) | Streamlit chat UI (`app_ui.py`) + HTTP client (`api_client.py`) over the API; never imports `src` | 8 |
 | [`src/config.py`](agent-recommender/src/config.py) | Paths, model names, `TOP_K`, thresholds | — |
-| [`tests/`](agent-recommender/tests/) | One `test_*.py` per module + `test_chatbot.py` (E2E), `test_llm.py` (mocked LLM guardrails), `test_api.py` (HTTP) | all |
+| [`tests/`](agent-recommender/tests/) | One `test_*.py` per module + `test_chatbot.py` (E2E), `test_llm.py` (mocked LLM guardrails), `test_api.py` (HTTP); `frontend/tests/test_ui.py` (mocked HTTP) | all |
 
 `from src import handle, recommend, answer_question, detect_intent, build_index`
 is the public import surface.
@@ -146,7 +151,7 @@ handle(message, *, use_llm=True) -> str
 
 ```bash
 cd agent-recommender
-pytest                 # 84 passed — runs against the real agents/ catalog
+pytest                 # 95 passed — runs against the real agents/ catalog (incl. frontend/tests)
 python app.py index    # (re)build .chroma/ from agents/  (gitignored)
 python app.py          # REPL: describe a task, or ask about an agent; 'exit' to quit
 uvicorn api:app --port 8000   # optional: HTTP API (POST /chat, GET /agents, GET /health)
@@ -175,7 +180,7 @@ The architecture was built to grow. Common changes and where to make them:
 | **Swap the embedding model** | Change `index.get_embedding_function()` (one function) and re-index | retriever, paths |
 | **Swap the LLM** | Reimplement `src/llm.py`'s `generate()`/`available()`; keep the signatures | every caller (they only use `generate`) |
 | **Tune recommendation behavior** | `config.py`: `RECOMMEND_TOP_K`, `NO_MATCH_SCORE`, `AMBIGUITY_DELTA` | logic |
-| **Use / extend the web API** | The FastAPI backend already exists in `api.py` (Phase 7), importing `handle` from `src`; add endpoints there. A Streamlit UI over it is Phase 8 | `src/` core |
+| **Use / extend the web API** | The FastAPI backend already exists in `api.py` (Phase 7), importing `handle` from `src`; add endpoints there. A Streamlit UI over it lives in `frontend/` (Phase 8) | `src/` core |
 | **Recognize new intents/sections** | Extend the regexes in `router.py` / `info.py` (`_SECTION_PATTERNS`); keep the rule-based fallback deterministic | contracts |
 
 **House rules for any contributor (human or AI):**

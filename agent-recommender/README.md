@@ -15,16 +15,19 @@ python -m venv .venv
 .venv\Scripts\Activate.ps1          # Windows (PowerShell); use `source .venv/bin/activate` elsewhere
 pip install -r requirements.txt
 cp .env.example .env                 # then set GEMINI_API_KEY (optional)
-pytest                               # verify the install (84 passed)
+pytest                               # verify the install (95 passed)
 python app.py index                  # build the ChromaDB store from agents/
 python app.py                        # start the chatbot REPL
 
 # optional — serve the same core over HTTP instead of the CLI:
 uvicorn api:app --reload --port 8000 # POST /chat, GET /agents, GET /health (docs at /docs)
+
+# optional — a browser chat UI over that API (see frontend/README.md):
+cd frontend && pip install -r requirements.txt && streamlit run app_ui.py
 ```
 
-> **Status: backend complete (Phases 1–7), all 84 tests passing.** The full
-> pipeline is built and runnable end to end, both as a CLI and over HTTP:
+> **Status: complete (Phases 1–8), all 95 tests passing.** The full
+> pipeline is built and runnable end to end — as a CLI, over HTTP, and in a browser:
 > - **Phase 1** — catalog loader + data model (`src/loader.py`, `src/models.py`).
 > - **Phase 2** — ChromaDB indexer (`src/index.py`) + retriever (`src/retriever.py`).
 > - **Phase 3** — recommendation path (`src/recommender.py`): best-fitting agent(s)
@@ -39,8 +42,9 @@ uvicorn api:app --reload --port 8000 # POST /chat, GET /agents, GET /health (doc
 >   (`tests/test_llm.py`) proving the grounding gate holds with the LLM on.
 > - **Phase 7** — FastAPI backend (`api.py`): `POST /chat`, `GET /agents`,
 >   `GET /health` over the unchanged core. Run with `uvicorn api:app --port 8000`.
->
-> Still to come: **Phase 8** — a Streamlit chat UI calling the API.
+> - **Phase 8** — Streamlit chat UI in [`frontend/`](frontend/): a thin HTTP
+>   client over the API (`frontend/app_ui.py` + `frontend/api_client.py`) that
+>   never imports `src`. See [frontend/README.md](frontend/README.md).
 >
 > Build the store with `python app.py index`, then chat with `python app.py` (or
 > start the API with `uvicorn api:app`). Programmatically, the one-call entry point

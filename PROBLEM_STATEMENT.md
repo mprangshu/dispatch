@@ -3,10 +3,11 @@
 > **This file is the behavior spec — the source of truth for *what* the system
 > should do — and is kept stable.** For *build status*, see
 > [`PROJECT_HANDOFF_v2.md`](PROJECT_HANDOFF_v2.md); for an orientation/walkthrough,
-> see [`ONBOARDING.md`](ONBOARDING.md). As of now the core is **complete (Phases
-> 1–7, 84 tests passing)** — the LLM is verified live (Phase 6) and a FastAPI
-> backend is in place (Phase 7), with a Streamlit UI (Phase 8) still to come — and
-> every acceptance criterion in §9 is met.
+> see [`ONBOARDING.md`](ONBOARDING.md). As of now the project is **complete
+> (Phases 1–8, 95 tests passing)** — the LLM is verified live (Phase 6), a FastAPI
+> backend is in place (Phase 7), and a Streamlit UI over it ships in
+> `agent-recommender/frontend/` (Phase 8) — and every acceptance criterion in §9
+> is met.
 
 ## 1. Goal
 
