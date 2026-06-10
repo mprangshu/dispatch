@@ -37,8 +37,8 @@ in that agent's doc. It must never invent facts.
 | Agent catalog — 4 `.md` files normalized to one template (`agents/`) | ✅ Done |
 | `PROBLEM_STATEMENT.md` (the spec) | ✅ Done |
 | Repo folder structure scaffolded (stub files with docstrings) | ✅ Done |
-| **Phase 1** — `models.py` + `loader.py` + `tests/test_loader.py` | 🔄 In progress (being done now) |
-| Phase 2 — ChromaDB indexer | ⬜ Not started |
+| **Phase 1** — `models.py` + `loader.py` + `tests/test_loader.py` | ✅ Done (tested) |
+| **Phase 2** — `index.py` + `retriever.py` + `tests/test_indexer.py` | ✅ Done (tested) |
 | Phase 3 — Recommendation path | ⬜ Not started |
 | Phase 4 — Intent router + RAG info path | ⬜ Not started |
 | Phase 5 — Orchestration, CLI, integration tests | ⬜ Not started |
@@ -50,10 +50,10 @@ in that agent's doc. It must never invent facts.
 agent-recommender/
 ├── agents/                 # 4 normalized .md agent docs (the input data)
 ├── src/
-│   ├── models.py           # Agent data model            [Phase 1 — in progress]
-│   ├── loader.py           # parse .md -> Agent           [Phase 1 — in progress]
-│   ├── index.py            # build the ChromaDB store     [Phase 2]
-│   ├── retriever.py        # query ChromaDB               [Phase 2]
+│   ├── models.py           # Agent data model            [Phase 1 — done]
+│   ├── loader.py           # parse .md -> Agent           [Phase 1 — done]
+│   ├── index.py            # build the ChromaDB store     [Phase 2 — done]
+│   ├── retriever.py        # query ChromaDB               [Phase 2 — done]
 │   ├── router.py           # intent detection             [Phase 4]
 │   ├── chatbot.py          # orchestration                [Phase 5]
 │   └── config.py           # paths, model names, top_k
@@ -145,7 +145,29 @@ stub your dependencies against the contracts in section 7; run your own tests.**
 Always start the session by telling Claude Code to read `PROBLEM_STATEMENT.md`
 and this handoff file.
 
-### Phase 2 — Ingestion & Vector Store
+### Phase 2 — Ingestion & Vector Store ✅ DONE
+
+`src/index.py` and `src/retriever.py` are implemented and tested
+(`tests/test_indexer.py`). Notes for the consuming phases:
+
+- **Build the store:** `python -m src.index` — rebuilds both collections
+  (`agent_summaries`, `agent_sections`) cleanly from `agents/`. Writes to
+  `.chroma/`. Re-running is safe; no duplicates.
+- **Retriever contract is live** exactly as in section 7: `search_agents(query,
+  k=3, where=None)` and `search_sections(query, k=5, where=None)` return
+  `list[Hit]` ordered best-first. `Hit` is a dataclass with `agent_id`, `name`,
+  `text`, `score` (cosine similarity in `[0, 1]`, higher = closer), `section`
+  (`None` for agent-summary hits), and `metadata`.
+- **Metadata for `where` filters:** frontmatter list fields are flattened to
+  comma-joined strings — `tags`, `autonomy_supported` (e.g. `"L1, L2, L3"`),
+  `triggers` (`""` when unspecified, with a `triggers_specified` bool). Scalars
+  (`agent_id`, `name`, `domain`, `autonomy_default`, `section`) filter directly,
+  e.g. `where={"autonomy_default": "L4"}` or
+  `where={"$and": [{"agent_id": "..."}, {"section": "Inputs"}]}`.
+- **Embeddings:** Chroma's default (local, no API key) — swap in one place via
+  `index.get_embedding_function()`.
+
+The original kickoff prompt (kept for reference):
 ```
 Read PROBLEM_STATEMENT.md and PROJECT_HANDOFF.md. Phase 1 (models.py, loader.py)
 is done. Implement Phase 2 ONLY: src/index.py and src/retriever.py.

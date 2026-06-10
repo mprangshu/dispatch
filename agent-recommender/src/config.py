@@ -12,6 +12,14 @@ from pathlib import Path
 AGENTS_DIR = Path(__file__).resolve().parent.parent / "agents"
 CHROMA_PATH = Path(__file__).resolve().parent.parent / ".chroma"
 
+# Chroma collection names (one per retrieval granularity, built by index.py).
+SUMMARY_COLLECTION = "agent_summaries"   # coarse: one record per agent
+SECTION_COLLECTION = "agent_sections"    # fine: one record per body section
+
+# Cosine space keeps distances in [0, 2] so similarity = 1 - distance is well
+# defined; set on each collection at index time and used to score retrieval.
+DISTANCE_SPACE = "cosine"
+
 # Retrieval tunables.
 TOP_K = 4
 

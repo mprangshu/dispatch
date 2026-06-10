@@ -16,9 +16,12 @@ python -m venv .venv
 pip install -r requirements.txt
 cp .env.example .env                 # then set GEMINI_API_KEY
 pytest                               # verify the install
+python -m src.index                  # build the ChromaDB store from agents/
 ```
 
-> **Status:** Phase 1 (catalog loader + data model) is implemented and tested.
-> The indexer, retriever, router, and chatbot are still stubs — `app.py index`
-> and `app.py` are not runnable yet (see PROBLEM_STATEMENT.md section 6 for the
-> build order).
+> **Status:** Phases 1–2 are implemented and tested. Phase 1 = the catalog
+> loader + data model; Phase 2 = the ChromaDB indexer (`src/index.py`) and
+> retriever (`src/retriever.py`). You can build the store with
+> `python -m src.index` and query it via `src.retriever`. The router and
+> chatbot are still stubs, so the `app.py` REPL is not runnable yet (that's
+> Phase 5 — see PROBLEM_STATEMENT.md section 6 for the build order).

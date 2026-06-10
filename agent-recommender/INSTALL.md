@@ -3,9 +3,10 @@
 How to get the **Agent Recommender & Q&A Chatbot** running after cloning from
 GitHub.
 
-> **Project status:** Phase 1 (the catalog loader + data model) is implemented
-> and tested. The indexer, retriever, router, and chatbot are still stubs, so
-> the only thing runnable end-to-end today is the test suite. Steps marked
+> **Project status:** Phases 1–2 are implemented and tested — the catalog
+> loader + data model (Phase 1) and the ChromaDB indexer + retriever (Phase 2).
+> The catalog can be indexed today with `python -m src.index`. The router and
+> chatbot are still stubs, so the `app.py` REPL isn't runnable yet. Steps marked
 > _(coming soon)_ describe the intended workflow and don't work yet.
 
 ---
@@ -90,19 +91,26 @@ run the loader and tests.)
 pytest
 ```
 
-You should see the loader tests pass (10 passed). These run against the real
-agent files in `agents/`, so a green run confirms both the install and that the
-catalog parses correctly.
+You should see the suite pass (17 passed). These run against the real agent
+files in `agents/` — the loader tests confirm the catalog parses correctly, and
+the indexer/retriever tests build a throwaway ChromaDB store and query it, so a
+green run confirms the install, the catalog, and the vector store all work.
 
-## 7. Index the catalog _(coming soon)_
+> The first run downloads the default embedding model (a few tens of MB) and can
+> take ~1 minute; subsequent runs are fast.
 
-Once the indexer is implemented, this builds the local ChromaDB store from the
-`.md` files in `agents/`. It writes to `.chroma/` (gitignored) and is safe to
-re-run.
+## 7. Index the catalog
+
+This builds the local ChromaDB store from the `.md` files in `agents/`. It
+writes to `.chroma/` (gitignored) and is safe to re-run — each run rebuilds the
+store cleanly from the current files, so adding or editing an agent only needs a
+re-index, no code changes.
 
 ```bash
-# python app.py index      # not implemented yet
+python -m src.index
 ```
+
+> A convenience `python app.py index` subcommand will wrap this in Phase 5.
 
 ## 8. Run the chatbot _(coming soon)_
 
