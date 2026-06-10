@@ -1,5 +1,11 @@
 # Problem Statement — Agent Recommender & Q&A Chatbot
 
+> **This file is the behavior spec — the source of truth for *what* the system
+> should do — and is kept stable.** For *build status*, see
+> [`PROJECT_HANDOFF.md`](PROJECT_HANDOFF.md); for an orientation/walkthrough, see
+> [`ONBOARDING.md`](ONBOARDING.md). As of now the implementation is **complete
+> (Phases 1–5, 68 tests passing)** and every acceptance criterion in §9 is met.
+
 ## 1. Goal
 
 Build a chatbot that helps users work with a catalog of AI agents. Given a

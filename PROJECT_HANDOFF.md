@@ -30,7 +30,11 @@ in that agent's doc. It must never invent facts.
   - *section-chunk* records (one per `##` section) → used by the info path.
 - **CLI first.** Web/API later; keep core logic decoupled from the interface.
 
-## 3. Current state (as of this handoff)
+## 3. Current state — all phases complete ✅
+
+**The build is done: Phases 1–5 are implemented and tested (68 passing).** The
+chatbot is runnable end to end — `python app.py index` then `python app.py`. The
+only open item is data (the `TBD` Deployment fields), not code.
 
 | Item | Status |
 |------|--------|
@@ -41,7 +45,8 @@ in that agent's doc. It must never invent facts.
 | **Phase 2** — `index.py` + `retriever.py` + `tests/test_indexer.py` | ✅ Done (tested) |
 | **Phase 3** — Recommendation path (`recommender.py` + `llm.py` + `tests/test_recommender.py`) | ✅ Done (tested) |
 | **Phase 4** — Intent router (`router.py`) + RAG info path (`info.py`) + `tests/test_router.py` & `tests/test_info.py` | ✅ Done (tested) |
-| Phase 5 — Orchestration, CLI, integration tests | ⬜ Not started |
+| **Phase 5** — Orchestration (`chatbot.py`) + CLI (`app.py`) + `tests/test_chatbot.py` | ✅ Done (tested) |
+| All §9 acceptance criteria | ✅ Met (covered by `tests/test_chatbot.py`) |
 | Deployment (hardware/software) fields in the docs | ⬜ Still `TBD` — being chased with manager |
 
 ## 4. Repo layout
@@ -58,10 +63,10 @@ agent-recommender/
 │   ├── llm.py              # swappable LLM (Gemini) client [Phase 3 — done]
 │   ├── router.py           # intent detection             [Phase 4 — done]
 │   ├── info.py             # answer_question(query) RAG    [Phase 4 — done]
-│   ├── chatbot.py          # orchestration                [Phase 5]
-│   └── config.py           # paths, model names, top_k, thresholds
-├── tests/
-├── app.py                  # CLI entry point              [Phase 5]
+│   ├── chatbot.py          # handle(message) orchestration [Phase 5 — done]
+│   └── config.py           # paths, model names, top_k, thresholds [done]
+├── tests/                  # one test_*.py per module + test_chatbot.py (E2E)
+├── app.py                  # CLI entry point (index + chat) [Phase 5 — done]
 └── requirements.txt
 ```
 
@@ -141,12 +146,15 @@ answer_question(query: str) -> { answer: str, sources: list[Hit], grounded: bool
 handle(message: str) -> str   # detect_intent -> route -> format reply
 ```
 
-## 8. Your next step — ready-to-run Claude Code prompts
+## 8. Phase log — kept as a record (all phases ✅ DONE)
 
-Each prompt is scoped to one module. The rule: **implement only your module;
-stub your dependencies against the contracts in section 7; run your own tests.**
-Always start the session by telling Claude Code to read `PROBLEM_STATEMENT.md`
-and this handoff file.
+All five build phases are complete; the prompts below are retained as a record
+of how each module was scoped and what its consumer-facing notes are. Each prompt
+was scoped to one module, with the rule: **implement only your module; stub your
+dependencies against the contracts in section 7; run your own tests.** To pick up
+new work (e.g. a web front end, a 5th agent, swapping the embedding model), see
+**"Extending the project"** in [ONBOARDING.md](ONBOARDING.md), and still start any
+session by reading `PROBLEM_STATEMENT.md` and this file.
 
 ### Phase 2 — Ingestion & Vector Store ✅ DONE
 
@@ -277,7 +285,39 @@ hallucinate), and intent classification on a few sample messages. Run and show
 results.
 ```
 
-### Phase 5 — Orchestration, CLI & QA
+### Phase 5 — Orchestration, CLI & QA ✅ DONE
+
+`src/chatbot.py` and `app.py` are implemented and tested (`tests/test_chatbot.py`
+— 9 tests covering every §9 acceptance criterion; full suite **68 passed**). This
+closes the build.
+
+- **`handle(message)` contract is live** exactly as in section 7:
+  `handle(message: str) -> str`. It calls `detect_intent`, routes to `recommend`
+  / `answer_question` / a clarifying question, and formats one user-facing reply.
+  - **recommend** → returns the recommender's explanation; on a no-match it
+    appends the list of available agents (§4.5).
+  - **info** → returns the grounded answer with a `_Source: <name> — <section>_`
+    line; an ungrounded "I don't have that" passes straight through with no
+    source line (§4.4/§8).
+  - **clarify** (and empty input) → asks one clarifying question and lists what
+    the bot can do plus the available agents.
+  - Extra keyword-only arg `handle(message, *, use_llm=True)` threads through to
+    every path, so the whole chatbot runs deterministically offline. The path
+    functions/router are module-level names in `chatbot.py`, so they can be
+    monkeypatched in tests.
+- **`available_agent_names()`** reads the live catalog (no hard-coded names), so
+  a new `.md` file shows up in the edge-case replies automatically.
+- **CLI — `app.py`:** `python app.py index` (re)builds the store;
+  `python app.py` (or `python app.py chat`) runs the REPL. The REPL checks the
+  store exists and points you at `index` instead of crashing; clean exit on
+  `exit`/`quit`/Ctrl-D.
+- **Package exports:** `from src import handle, recommend, answer_question,
+  detect_intent, build_index` — one import surface for the CLI, tests, and any
+  future web/API front end.
+- **`config.py`** needed no Phase-5 changes (Phase 3 had already filled the
+  thresholds); it stays the single place for paths, model names, and tunables.
+
+The original kickoff prompt (kept for reference):
 ```
 Read PROBLEM_STATEMENT.md and PROJECT_HANDOFF.md. Implement chatbot.py, app.py,
 and config.py ONLY. handle(message) calls detect_intent() then routes to

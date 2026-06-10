@@ -14,24 +14,29 @@ version:
 python -m venv .venv
 .venv\Scripts\Activate.ps1          # Windows (PowerShell); use `source .venv/bin/activate` elsewhere
 pip install -r requirements.txt
-cp .env.example .env                 # then set GEMINI_API_KEY
-pytest                               # verify the install
-python -m src.index                  # build the ChromaDB store from agents/
+cp .env.example .env                 # then set GEMINI_API_KEY (optional)
+pytest                               # verify the install (68 passed)
+python app.py index                  # build the ChromaDB store from agents/
+python app.py                        # start the chatbot REPL
 ```
 
-> **Status:** Phases 1–4 are implemented and tested. Phase 1 = the catalog
-> loader + data model; Phase 2 = the ChromaDB indexer (`src/index.py`) and
-> retriever (`src/retriever.py`); Phase 3 = the recommendation path
-> (`src/recommender.py`), which returns the best-fitting agent(s) for a described
-> need with a grounded explanation; Phase 4 = the intent router (`src/router.py`,
-> `detect_intent`) and the RAG info path (`src/info.py`, `answer_question`),
-> which answers a question about an agent grounded strictly in its doc and says
-> "I don't have that information" rather than guessing when a field is `TBD`. You
-> can build the store with `python -m src.index`, query it via `src.retriever`,
-> get a recommendation via `src.recommender.recommend(query)`, classify a message
-> via `src.router.detect_intent(query)`, and answer a question via
-> `src.info.answer_question(query)`. The LLM paths use the configured model (set
-> `GEMINI_API_KEY`) but fall back to deterministic behavior when it's
-> unavailable. The chatbot orchestration and CLI are still stubs, so the `app.py`
-> REPL is not runnable yet (that's Phase 5 — see PROBLEM_STATEMENT.md section 6
-> for the build order).
+> **Status: complete (Phases 1–5), all 68 tests passing.** The full pipeline is
+> built and the chatbot is runnable end to end:
+> - **Phase 1** — catalog loader + data model (`src/loader.py`, `src/models.py`).
+> - **Phase 2** — ChromaDB indexer (`src/index.py`) + retriever (`src/retriever.py`).
+> - **Phase 3** — recommendation path (`src/recommender.py`): best-fitting agent(s)
+>   with a grounded explanation.
+> - **Phase 4** — intent router (`src/router.py`, `detect_intent`) + RAG info path
+>   (`src/info.py`, `answer_question`): answers about an agent grounded strictly in
+>   its doc, saying "I don't have that information" rather than guessing when a
+>   field is `TBD`.
+> - **Phase 5** — orchestration (`src/chatbot.py`, `handle`) + the CLI (`app.py`).
+>
+> Build the store with `python app.py index`, then chat with `python app.py`.
+> Programmatically, the one-call entry point is `src.chatbot.handle(message)`; the
+> individual paths (`recommend`, `answer_question`, `detect_intent`) are also
+> exported from the `src` package. The LLM paths use the configured model (set
+> `GEMINI_API_KEY`) but fall back to deterministic, grounded behavior when it's
+> unavailable, so everything runs offline too. See
+> [ONBOARDING.md](../ONBOARDING.md) for a full walkthrough and
+> [PROBLEM_STATEMENT.md](../PROBLEM_STATEMENT.md) for the spec.

@@ -3,13 +3,13 @@
 How to get the **Agent Recommender & Q&A Chatbot** running after cloning from
 GitHub.
 
-> **Project status:** Phases 1–4 are implemented and tested — the catalog
+> **Project status: complete (Phases 1–5), all 68 tests passing.** The catalog
 > loader + data model (Phase 1), the ChromaDB indexer + retriever (Phase 2), the
-> recommendation path (Phase 3, `src/recommender.py`), and the intent router +
-> RAG info path (Phase 4, `src/router.py` + `src/info.py`). The catalog can be
-> indexed today with `python -m src.index`. The chatbot orchestration and CLI are
-> still stubs, so the `app.py` REPL isn't runnable yet. Steps marked
-> _(coming soon)_ describe the intended workflow and don't work yet.
+> recommendation path (Phase 3, `src/recommender.py`), the intent router + RAG
+> info path (Phase 4, `src/router.py` + `src/info.py`), and the orchestration +
+> CLI (Phase 5, `src/chatbot.py` + `app.py`) are all implemented and tested. The
+> chatbot is runnable end to end — index with `python app.py index`, then chat
+> with `python app.py`.
 
 ---
 
@@ -18,9 +18,10 @@ GitHub.
 - **Python 3.11 or newer** — check with `python --version`.
 - **git** — to clone the repository.
 - An **LLM API key** (Google Gemini by default) — used for LLM-generated
-  recommendation explanations and (later) the chatbot paths. Optional: the
-  recommender falls back to a deterministic explanation without it, and the
-  loader/tests don't need it. Get one at <https://aistudio.google.com/apikey>.
+  recommendation explanations and the chatbot's grounded answers. Optional:
+  every path falls back to deterministic, grounded behavior without it, so the
+  chatbot and the tests run fully offline. Get one at
+  <https://aistudio.google.com/apikey>.
 
 ## 2. Clone the repository
 
@@ -95,14 +96,17 @@ explanations.)
 pytest
 ```
 
-You should see the suite pass (59 passed). These run against the real agent
+You should see the suite pass (68 passed). These run against the real agent
 files in `agents/` — the loader tests confirm the catalog parses correctly, the
 indexer/retriever tests build a throwaway ChromaDB store and query it, the
 recommender tests check the recommendation path (clear match, ambiguous
-shortlist, metadata-filtered query, and no-match), and the router/info tests
-check intent classification and the grounded RAG answers (including the honest
-"I don't have that" for `TBD` fields) — so a green run confirms the install, the
-catalog, the vector store, and the recommendation/info logic all work.
+shortlist, metadata-filtered query, and no-match), the router/info tests check
+intent classification and the grounded RAG answers (including the honest "I
+don't have that" for `TBD` fields), and the chatbot tests drive `handle()` end
+to end across every acceptance criterion (recommendation, grounded answer,
+honest "not available", vague→clarify, and new-agent discoverability after
+re-indexing) — so a green run confirms the install, the catalog, the vector
+store, and the full recommendation/info/orchestration logic all work.
 
 > The first run downloads the default embedding model (a few tens of MB) and can
 > take ~1 minute; subsequent runs are fast.
@@ -115,15 +119,34 @@ store cleanly from the current files, so adding or editing an agent only needs a
 re-index, no code changes.
 
 ```bash
-python -m src.index
+python app.py index
 ```
 
-> A convenience `python app.py index` subcommand will wrap this in Phase 5.
+> `python -m src.index` does the same thing — `python app.py index` is just the
+> convenience wrapper. The first run downloads the embedding model (see the note
+> in step 6).
 
-## 8. Run the chatbot _(coming soon)_
+## 8. Run the chatbot
 
 ```bash
-# python app.py            # not implemented yet
+python app.py
+```
+
+This starts an interactive REPL. Describe a task to get a recommendation, or ask
+a question about a specific agent; type `exit` (or press Ctrl-D) to quit. If you
+haven't indexed yet, the REPL tells you to run `python app.py index` first.
+
+```text
+you> I need to automate UI tests from a live URL
+I'd recommend **Test Script Generator Agent**. …
+
+you> What are the inputs to Test Data Provisioning?
+From the Test Data Provisioning documentation (Inputs):
+| User Story ID | Yes | … |
+_Source: Test Data Provisioning — Inputs_
+
+you> What hardware does the User Story Analyser need?
+I don't have that information. … it's currently marked TBD / not specified.
 ```
 
 ---
