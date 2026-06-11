@@ -128,7 +128,7 @@ Both paths now produce prose, governed by `use_llm` and `llm.generate`'s result
 | info | LLM answers using *only* the retrieved excerpts | Quotes the section verbatim: "From the <name> documentation (<section>): …" |
 
 The LLM is always told to use only the supplied text and never invent
-capabilities. Temperature is low (0.5) for stable output.
+capabilities. Temperature is kept moderate (0.5) for stable output.
 
 ## Step 5 — Format one reply
 

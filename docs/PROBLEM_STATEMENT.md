@@ -46,9 +46,11 @@ reliably target one section.
 > [AGENT_TEMPLATE.md](AGENT_TEMPLATE.md). It is the single source of truth for the
 > file format.
 
-There are currently **four agents** in the catalog (`smarttdm-agenticdc`,
-`user-story-analyser`, `test-data-provisioning`, `test-script-generator`). The
-catalog is expected to grow, so nothing is hard-coded to four agents.
+There are currently **eight agents** in the catalog (`smarttdm-agenticdc`,
+`user-story-analyser`, `test-data-provisioning`, `test-script-generator`,
+`api-contract-validator`, `mobile-app-tester`, `security-scan-agent`,
+`accessibility-auditor`). The catalog is expected to grow, so nothing is
+hard-coded to a fixed agent count.
 
 ## 4. Functional Requirements
 

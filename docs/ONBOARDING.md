@@ -39,7 +39,8 @@ responsibility; the public import surface is
 | [`agents/*.md`](../agent-recommender/agents/) | The catalog (input data): frontmatter + fixed `##` sections | data |
 | [`src/models.py`](../agent-recommender/src/models.py) | `Agent` dataclass; `get_section()`, `summary_text()` | 1 |
 | [`src/loader.py`](../agent-recommender/src/loader.py) | Parse a `.md` → `Agent` (YAML frontmatter + sections) | 1 |
-| [`src/index.py`](../agent-recommender/src/index.py) | Build the two ChromaDB collections; owns the shared client + embedding fn | 2 |
+| [`src/index.py`](../agent-recommender/src/index.py) | Build the two ChromaDB collections from the catalog (`build_index`) | 2 |
+| [`src/store.py`](../agent-recommender/src/store.py) | Shared cached Chroma client + embedding fn + collection handles; `refresh_catalog_caches()` | 2 |
 | [`src/retriever.py`](../agent-recommender/src/retriever.py) | `search_agents` / `search_sections` → `list[Hit]` | 2 |
 | [`src/recommender.py`](../agent-recommender/src/recommender.py) | `recommend(query)`; implied filters; shortlist logic | 3 |
 | [`src/llm.py`](../agent-recommender/src/llm.py) | Swappable Gemini wrapper, `generate()` / `available()` | 3 |
@@ -48,10 +49,11 @@ responsibility; the public import surface is
 | [`src/chatbot.py`](../agent-recommender/src/chatbot.py) | `handle(message)` — intent → route → formatted reply | 5 |
 | [`app.py`](../agent-recommender/app.py) | CLI: `index` subcommand + chat REPL | 5 |
 | [`scripts/verify_llm.py`](../agent-recommender/scripts/verify_llm.py) | Manual LLM on/off A/B over three queries (hits the real API) | 6 |
+| [`scripts/watch_agents.py`](../agent-recommender/scripts/watch_agents.py) | watchdog watcher: auto re-index + cache refresh on `agents/` changes | — |
 | [`api.py`](../agent-recommender/api.py) | FastAPI backend over `src.handle` | 7 |
 | [`frontend/`](../agent-recommender/frontend/) | Streamlit web UI (`app_ui.py`) + HTTP client (`api_client.py`); talks to `api.py` only, never `src` | 8 |
 | [`src/config.py`](../agent-recommender/src/config.py) | Paths, model names, `TOP_K`, thresholds | — |
-| [`tests/`](../agent-recommender/tests/) + [`frontend/tests/`](../agent-recommender/frontend/tests/) | One `test_*.py` per module + E2E + mocked-LLM + API tests; `frontend/tests/test_ui.py` mocks the HTTP layer | all |
+| [`tests/`](../agent-recommender/tests/) + [`frontend/tests/`](../agent-recommender/frontend/tests/) | One `test_*.py` per module + E2E + mocked-LLM + API + store-caching tests; `frontend/tests/test_ui.py` mocks the HTTP layer | all |
 
 ## 3. Where to look when…
 
@@ -75,7 +77,7 @@ The architecture was built to grow. Each task has a single doc that owns the
 |---|---|
 | Add a new agent | [AGENT_TEMPLATE.md](AGENT_TEMPLATE.md) (then `python app.py index`) |
 | Fill the `TBD` Deployment fields | [AGENT_TEMPLATE.md](AGENT_TEMPLATE.md) — the grounding gate auto-flips those answers once real content exists |
-| Swap the embedding model | [CONFIGURATION.md](CONFIGURATION.md) + [ARCHITECTURE.md](ARCHITECTURE.md) (`index.get_embedding_function()`) |
+| Swap the embedding model | [CONFIGURATION.md](CONFIGURATION.md) + [ARCHITECTURE.md](ARCHITECTURE.md) (`store.get_embedding_function()`) |
 | Swap the LLM | [ARCHITECTURE.md](ARCHITECTURE.md#5-the-llm-optional-pattern) (reimplement `src/llm.py`, keep the signatures) |
 | Tune recommendation behavior | [CONFIGURATION.md](CONFIGURATION.md) (`RECOMMEND_TOP_K`, `NO_MATCH_SCORE`, `AMBIGUITY_DELTA`) |
 | Use / extend the web API | [API_REFERENCE.md](API_REFERENCE.md) (`api.py` imports `handle` from `src`) |

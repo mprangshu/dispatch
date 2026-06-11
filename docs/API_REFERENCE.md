@@ -91,8 +91,10 @@ curl -s localhost:8000/agents
 ```
 
 Add an `.md` file to `agents/` and it appears here on the next request — no
-restart or code change needed (the data is read live; only `/chat` retrieval
-needs a re-index).
+restart or code change needed (the data is read live). `/chat` retrieval needs a
+re-index (`python app.py index`, or run `scripts/watch_agents.py`); because
+`build_index()` calls `store.refresh_catalog_caches()`, a running server then
+serves the new agent on its next request **without a restart**.
 
 ---
 

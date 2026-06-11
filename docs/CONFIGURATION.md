@@ -28,6 +28,12 @@ it does, its default, and when you'd change it.
 > Changing any store setting means the on-disk store no longer matches the config —
 > **re-run `python app.py index`** to rebuild.
 
+> The Chroma client, embedding function, and collection handles are cached as
+> process-level singletons in `src/store.py` (so they're not re-created per query).
+> `build_index()` calls `store.refresh_catalog_caches()` at the end, so a
+> long-running server picks up catalog changes after a re-index without a restart;
+> the client re-opens automatically if `CHROMA_PATH` changes (as tests do).
+
 ## Retrieval limits (`k`)
 
 | Setting | Default | What it does | When to change |
@@ -56,7 +62,7 @@ top out below ~0.1.
 | Setting | Default | What it does | When to change |
 |---------|---------|--------------|----------------|
 | `MODEL` | `"gemini-2.5-flash"` | The LLM used for answer/explanation prose (via `src/llm.py`). Reads `GEMINI_API_KEY`. | To use a different Gemini model. Switching providers means editing `src/llm.py` too. |
-| `EMBEDDING_MODEL` | `"chroma-default"` | A label noting which embedding function is used. The actual function is `index.get_embedding_function()` → ChromaDB's built-in `all-MiniLM-L6-v2`, which runs **locally, no API key**. | To swap embeddings, edit `get_embedding_function()` in `src/index.py` (one place), then **re-index** and re-calibrate the thresholds above. |
+| `EMBEDDING_MODEL` | `"chroma-default"` | A label noting which embedding function is used. The actual function is `store.get_embedding_function()` (re-exported by `index`) → ChromaDB's built-in `all-MiniLM-L6-v2`, which runs **locally, no API key**. It's built once per process and cached. | To swap embeddings, edit `get_embedding_function()` in `src/store.py` (one place), then **re-index** and re-calibrate the thresholds above. |
 
 ## Environment / `.env`
 

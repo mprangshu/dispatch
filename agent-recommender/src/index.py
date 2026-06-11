@@ -25,47 +25,22 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import chromadb
-from chromadb.utils import embedding_functions
-
 from . import config
 from .loader import load_agents
 from .models import Agent
+from .store import (
+    get_client,
+    get_embedding_function,
+    get_section_collection,
+    get_summary_collection,
+    refresh_catalog_caches,
+)
 
-# ---------------------------------------------------------------------------
-# Shared store access (used by index.py and retriever.py alike)
-# ---------------------------------------------------------------------------
-
-
-def get_embedding_function():
-    """Return the embedding function the store is built and queried with.
-
-    Defaults to ChromaDB's built-in model (all-MiniLM-L6-v2, runs locally via
-    onnxruntime — no API key needed). Swap this single function to change the
-    embedding model for both indexing and retrieval.
-    """
-    return embedding_functions.DefaultEmbeddingFunction()
-
-
-def get_client(path: str | Path | None = None) -> chromadb.api.ClientAPI:
-    """Open (or create) the persistent Chroma client at ``CHROMA_PATH``."""
-    path = Path(path) if path is not None else config.CHROMA_PATH
-    path.mkdir(parents=True, exist_ok=True)
-    return chromadb.PersistentClient(path=str(path))
-
-
-def _collection(client, name: str):
-    """Open an existing collection with the right embedding fn + distance space."""
-    return client.get_collection(name=name, embedding_function=get_embedding_function())
-
-
-def get_summary_collection(client):
-    return _collection(client, config.SUMMARY_COLLECTION)
-
-
-def get_section_collection(client):
-    return _collection(client, config.SECTION_COLLECTION)
-
+# The shared Chroma client, embedding function, and collection accessors now
+# live in ``store.py`` as process-level singletons (so they're not re-created on
+# every query). They're re-exported here so index.py's public API is unchanged.
+# ``refresh_catalog_caches`` is used by build_index() below to invalidate
+# catalog-derived caches after a rebuild.
 
 # ---------------------------------------------------------------------------
 # Metadata flattening (Chroma metadata values must be str/int/float/bool)
@@ -148,6 +123,11 @@ def build_index(agents_dir: str | Path | None = None, chroma_path: str | Path | 
                 metadatas=[{**base_meta, "section": section}],
             )
             n_sections += 1
+
+    # The catalog just changed: drop the cached collection handles and the
+    # router/chatbot name caches so a running process sees the new agents
+    # immediately, with no restart (cache invalidation after re-index).
+    refresh_catalog_caches()
 
     return {
         "agents": len(agents),

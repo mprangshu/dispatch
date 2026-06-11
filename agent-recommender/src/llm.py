@@ -54,7 +54,8 @@ def generate(prompt: str, system: str | None = None, model: str | None = None) -
     """Generate text for ``prompt``; return ``None`` if the LLM is unavailable.
 
     ``system`` is an optional system instruction; ``model`` overrides
-    ``config.MODEL``. Temperature is kept low for stable, grounded output.
+    ``config.MODEL``. Temperature is kept moderate (0.5) for stable, grounded
+    output.
     """
     client = _client_or_none()
     if client is None:

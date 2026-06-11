@@ -7,7 +7,7 @@ network-free, and what proves the acceptance criteria.
   ```bash
   pytest
   ```
-- **Status:** 95 tests passing.
+- **Status:** 109 tests passing.
 - **No API key required.** Everything runs offline (see the patterns below).
 
 ---
@@ -24,6 +24,7 @@ network-free, and what proves the acceptance criteria.
 | [tests/test_chatbot.py](../agent-recommender/tests/test_chatbot.py) | Phase 5 — `chatbot.py` (E2E) | The §9 acceptance criteria, end to end. |
 | [tests/test_llm.py](../agent-recommender/tests/test_llm.py) | Phase 6 — LLM guardrails | **Fully mocked** — proves the grounding gate holds with the LLM "on". |
 | [tests/test_api.py](../agent-recommender/tests/test_api.py) | Phase 7 — `api.py` | FastAPI endpoints via `TestClient`. |
+| [tests/test_store.py](../agent-recommender/tests/test_store.py) | `store.py` caching + cache invalidation | Asserts the client is opened once across queries, and that a re-index makes a new agent recognized immediately (no restart). |
 | [frontend/tests/test_ui.py](../agent-recommender/frontend/tests/test_ui.py) | Phase 8 — `frontend/` UI | Mocks the HTTP layer (`requests.get`/`post`) — no live server or Streamlit session needed. |
 
 ---
@@ -86,7 +87,7 @@ for invented in ("a100", "gpu", "ram", "gb", "cpu", "cores"):
 Nothing special is required:
 
 - No `GEMINI_API_KEY` → `llm.available()` is `False`, `llm.generate()` returns
-  `None`, paths fall back deterministically. All 95 tests pass.
+  `None`, paths fall back deterministically. All 109 tests pass.
 - `test_api.py::test_health_reports_ok_and_llm_flag` asserts `llm_available`
   **matches** `llm.available()` rather than a fixed value, so it's correct whether
   or not a key is present.

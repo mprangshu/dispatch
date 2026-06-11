@@ -60,8 +60,8 @@ pip install -r requirements.txt
 ```
 
 This installs `chromadb`, `google-genai`, `pyyaml`, `python-dotenv`, `fastapi`,
-`uvicorn[standard]` (the HTTP backend), `pytest`, and `httpx` (used by the API
-tests).
+`uvicorn[standard]` (the HTTP backend), `watchdog` (for the optional
+auto-reindex watcher), `pytest`, and `httpx` (used by the API tests).
 
 ## 5. Configure your API key (optional)
 
@@ -82,7 +82,7 @@ tunables: [CONFIGURATION.md](CONFIGURATION.md).)
 pytest
 ```
 
-You should see **95 passed**. The tests run offline and need no API key — what
+You should see **109 passed**. The tests run offline and need no API key — what
 each one covers is in [TESTING.md](TESTING.md).
 
 > **First-run note (applies to step 6 and 7):** the first time anything builds or
@@ -97,6 +97,10 @@ Builds the local ChromaDB store from the `.md` files in `agents/` (writes to
 ```bash
 python app.py index
 ```
+
+> Re-run this whenever you add/edit/remove an agent `.md`. To do it automatically,
+> run the watcher instead: `python scripts/watch_agents.py` (needs `watchdog`) —
+> it re-indexes and refreshes caches on every change. See [RUNBOOK.md](RUNBOOK.md).
 
 ## 8. Run it
 

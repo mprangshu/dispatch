@@ -108,7 +108,8 @@ restart needed — the wrapper recovers automatically on the next successful cal
 | Every answer looks like the deterministic fallback | Either no `GEMINI_API_KEY`, or quota hit (429). Check `GET /health` → `llm_available`. |
 | `ModuleNotFoundError: chromadb` / `yaml` / `fastapi` | venv not active or deps not installed → `pip install -r requirements.txt`. |
 | `uvicorn` / `fastapi` not found | Same — re-install deps with the venv active. |
-| New agent `.md` not showing up in answers | Re-index: `python app.py index`. (`GET /agents` reads live and updates without re-index; **retrieval** needs the re-index.) |
+| New agent `.md` not showing up in answers | Re-index: `python app.py index`. (`GET /agents` reads live and updates without re-index; **retrieval** needs the re-index.) A running server/CLI picks up the new agent on the next request after the re-index — no restart (`build_index()` calls `store.refresh_catalog_caches()`). To automate this, run `python scripts/watch_agents.py`. |
+| Re-indexed but a long-running process still serves the old catalog | It shouldn't — `build_index()` invalidates the caches. If you indexed in a *separate* process from the running server, that server won't see it until it re-indexes itself; re-index in-process (or via the watcher), or restart it. |
 | A new `.md` breaks loading | `pytest tests/test_loader.py` — it runs against the real catalog and points at the malformed file. Check the YAML frontmatter. |
 | Tests fail on a fresh machine, first run only | The embedding model download may have been interrupted — re-run `pytest` once it completes (~1 min). |
 | PowerShell won't activate the venv | `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`, then re-activate. |
@@ -119,14 +120,29 @@ restart needed — the wrapper recovers automatically on the next successful cal
 ```bash
 curl -s localhost:8000/health     # {"status":"ok","llm_available":<bool>}
 curl -s localhost:8000/agents     # the live catalog — confirms agents/ is readable
-pytest -q                         # full offline verification (95 passing)
+pytest -q                         # full offline verification (109 passing)
 python scripts/verify_llm.py      # LLM on-vs-off A/B (needs store built)
 ```
+
+## Auto-reindex on file changes (optional)
+
+Instead of re-indexing by hand, run the watcher (needs `watchdog`, in
+`requirements.txt`):
+
+```bash
+python scripts/watch_agents.py     # watches agents/; Ctrl-C to stop
+```
+
+It builds the store once on startup, then on every `.md` add/modify/delete it
+re-runs `build_index()` and `refresh_catalog_caches()` and prints a timestamped
+line — so an in-process server reflects catalog edits with no manual step.
 
 ## Safe to re-run
 
 - `python app.py index` is **idempotent** — it drops and rebuilds both collections
-  cleanly. Re-run any time you add/edit/remove an agent file.
+  cleanly. Re-run any time you add/edit/remove an agent file. It also refreshes the
+  in-process caches (`store.refresh_catalog_caches()`), so the running app sees the
+  change on the next request.
 - Restarting `uvicorn` is harmless; it reads the same store and live catalog.
 - No data is mutated by chatting — the bot only reads. There's no user state or
   persistence beyond the Chroma store (PROBLEM_STATEMENT.md §7).

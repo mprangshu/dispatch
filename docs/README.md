@@ -11,7 +11,7 @@ one-paragraph overview; every other topic has exactly one home, linked below.
 > and honestly saying *"I don't have that information"* when a field is `TBD`. No
 > API key is required to run it: every LLM call has a deterministic, grounded
 > fallback. **Status: complete (Phases 1–8) — core, CLI, HTTP API, and Streamlit
-> web UI all built; 95 tests passing** — details in
+> web UI all built; 109 tests passing** — details in
 > [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md).
 
 ---

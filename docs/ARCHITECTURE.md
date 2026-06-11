@@ -114,7 +114,7 @@ behind one wrapper: `src/llm.py`.
 
 This is also why the embeddings are chosen to need **no API key**: ChromaDB's
 default model (`all-MiniLM-L6-v2`) runs locally via `onnxruntime`. Swappable in
-exactly one function, `index.get_embedding_function()`.
+exactly one function, `store.get_embedding_function()` (re-exported by `index`).
 
 A second deliberate choice: **intent detection does not use the LLM in normal
 operation.** `chatbot.handle` always classifies with the deterministic rule-based
@@ -146,7 +146,30 @@ Everything tunable lives in `src/config.py` (paths, collection names, model name
 and the retrieval thresholds can each be changed in one place without touching the
 rest of the architecture. See [CONFIGURATION.md](CONFIGURATION.md).
 
-## 8. Key dependencies
+## 8. Shared store, caching & cache invalidation
+
+Both the indexer and the retriever go through one module — **`src/store.py`** —
+which owns process-level singletons: a cached `PersistentClient`, the embedding
+function (built once), and handles to the two collections. Opening the client and
+re-instantiating the onnx embedding wrapper are expensive, so caching them keeps
+every query fast and avoids Chroma "multiple client" warnings. `index.py` and
+`retriever.py` import these accessors (index re-exports them for API
+compatibility); neither opens its own client. The client re-opens only if a
+*different* path is requested (e.g. tests pointing `CHROMA_PATH` at a temp dir).
+
+Because some state is **derived from the catalog**, a re-index must invalidate it.
+`store.refresh_catalog_caches()` — called at the end of `build_index()` — drops the
+cached collection handles and clears the `lru_cache`s on `router._agent_terms` and
+`chatbot.available_agent_names`. The effect: a **long-running process** (e.g. the
+FastAPI server) reflects added/removed/edited agents on the next request *after a
+re-index*, with no restart. The cached client and embedding function are kept; only
+catalog-derived state is dropped.
+
+For zero-touch updates, **`scripts/watch_agents.py`** (watchdog) watches `agents/`
+and runs `build_index()` + `refresh_catalog_caches()` automatically whenever a `.md`
+file is added, modified, or deleted.
+
+## 9. Key dependencies
 
 | Package | Role |
 |---------|------|
@@ -156,4 +179,5 @@ rest of the architecture. See [CONFIGURATION.md](CONFIGURATION.md).
 | `python-dotenv` | Load `GEMINI_API_KEY` from `.env`. |
 | `fastapi` + `uvicorn[standard]` | The HTTP layer (`api.py`). |
 | `streamlit` + `requests` | The web UI (`frontend/`); declared in `frontend/requirements.txt`, not the backend's. |
+| `watchdog` | Filesystem watcher for `scripts/watch_agents.py` (auto re-index); only needed to run the watcher. |
 | `pytest` + `httpx` | Tests (`httpx` backs FastAPI's `TestClient`). |

@@ -61,10 +61,16 @@ load_agents(directory: str | Path) -> list[Agent]   # sorted, deterministic
 
 # index.py
 build_index(agents_dir=None, chroma_path=None) -> dict
-# Rebuilds BOTH collections cleanly. Returns:
+# Rebuilds BOTH collections cleanly, then calls store.refresh_catalog_caches(). Returns:
 #   { "agents": int, "summary_records": int, "section_records": int, "chroma_path": str }
-get_embedding_function()            # the single swap point for embeddings
-get_client(path=None)               # shared persistent Chroma client
+
+# store.py — shared, process-level singletons (also re-exported by index.py)
+get_client(path=None)                  # cached persistent Chroma client; re-opens on a path change
+get_embedding_function()               # the single swap point for embeddings (cached)
+get_summary_collection(client=None)    # cached handle to the agent_summaries collection
+get_section_collection(client=None)    # cached handle to the agent_sections collection
+refresh_catalog_caches()               # after a re-index: drop cached collections + clear
+                                       #   router._agent_terms / chatbot.available_agent_names lru_caches
 ```
 
 ## Retriever (Phase 2 provides; Phases 3 & 4 consume)

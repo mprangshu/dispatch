@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .index import get_client, get_section_collection, get_summary_collection
+from .store import get_client, get_section_collection, get_summary_collection
 
 
 @dataclass

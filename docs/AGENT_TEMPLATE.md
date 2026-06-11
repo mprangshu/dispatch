@@ -104,7 +104,10 @@ doesn't have that detail until you fill it in.
 2. Use valid YAML frontmatter (run a quick `pytest tests/test_loader.py` — the
    loader tests run against the real catalog and will flag a malformed file).
 3. Keep the seven section headers spelled exactly as shown.
-4. Re-index: `python app.py index`.
+4. Re-index: `python app.py index` (or leave `python scripts/watch_agents.py`
+   running and it re-indexes automatically on save). A re-index also refreshes the
+   in-process caches, so a running CLI/server recognizes the new agent on the next
+   request — no restart.
 5. Verify discoverability: ask the chatbot a question that should match it, or
    `GET /agents` to confirm it's listed.
 

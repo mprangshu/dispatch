@@ -15,7 +15,7 @@
 
 ## 1. What we're building (one paragraph)
 
-A chatbot over a catalog of AI agents (currently four, all QA/testing). Each agent
+A chatbot over a catalog of AI agents (currently eight, all QA/testing). Each agent
 is described by one Markdown file. The bot does two things: **(a) recommendation**
 — the user describes a need and the bot says which agent fits and why; **(b) info
 lookup** — the user asks about an agent and the bot answers, grounded strictly in
@@ -23,13 +23,13 @@ that agent's doc. It must never invent facts.
 
 ## 2. Current status
 
-**Complete — Phases 1–8 implemented and tested (95 passing): the core, CLI, HTTP
+**Complete — Phases 1–8 implemented and tested (109 passing): the core, CLI, HTTP
 API, and Streamlit web UI are all built. The one open data item is the `TBD`
 Deployment fields.**
 
 | Area | State |
 |------|-------|
-| Agent catalog — 4 `.md` files normalized to one template | ✅ Done |
+| Agent catalog — 8 `.md` files normalized to one template | ✅ Done |
 | Phase 1 — `models.py` + `loader.py` (+ tests) | ✅ Done |
 | Phase 2 — `index.py` + `retriever.py` (+ tests) | ✅ Done |
 | Phase 3 — recommendation path `recommender.py` + shared `llm.py` (+ tests) | ✅ Done |
@@ -38,7 +38,8 @@ Deployment fields.**
 | Phase 6 — live-LLM activation & verification (`scripts/verify_llm.py`, mocked `tests/test_llm.py`) | ✅ Done |
 | Phase 7 — FastAPI backend `api.py` (+ `tests/test_api.py`) | ✅ Done |
 | Phase 8 — Streamlit UI `frontend/` over the API (+ `frontend/tests/test_ui.py`) | ✅ Done |
-| Test suite | ✅ 95 passing (deterministic/mocked; CI needs no key) |
+| Hardening — cached Chroma client/embedding (`store.py`), cache invalidation after re-index, `scripts/watch_agents.py` auto-reindexer (+ `tests/test_store.py`) | ✅ Done |
+| Test suite | ✅ 109 passing (deterministic/mocked; CI needs no key) |
 | Deployment (hardware/software) doc fields | ⬜ Still `TBD` — info path correctly answers "not available" until filled |
 
 ## 3. Build order (how the phases depend)
@@ -83,11 +84,15 @@ sections); lists stay lists (flattening is the indexer's job). Tested against th
 real catalog.
 
 ### Phase 2 — Ingestion & Vector Store ✅
-`src/index.py` + `src/retriever.py`. Build two collections (`agent_summaries`,
-`agent_sections`) cleanly from `agents/`; re-running rebuilds with no duplicates.
-The retriever exposes `search_agents` / `search_sections` (see
-[CONTRACTS.md](CONTRACTS.md)). Embeddings use Chroma's default (local, no key),
-swappable in one place via `index.get_embedding_function()`.
+`src/index.py` + `src/retriever.py` (+ shared `src/store.py`). Build two
+collections (`agent_summaries`, `agent_sections`) cleanly from `agents/`;
+re-running rebuilds with no duplicates. The retriever exposes `search_agents` /
+`search_sections` (see [CONTRACTS.md](CONTRACTS.md)). The Chroma client, embedding
+function, and collection handles are cached process-level singletons in
+`store.py`; embeddings use Chroma's default (local, no key), swappable in one place
+via `store.get_embedding_function()`. `build_index()` calls
+`store.refresh_catalog_caches()` so a running process sees catalog changes after a
+re-index without a restart.
 
 ```
 Read PROBLEM_STATEMENT.md and PROJECT_HANDOFF.md. Phase 1 (models.py, loader.py)
