@@ -56,6 +56,15 @@ def test_info_answer_is_grounded_in_the_right_section(built_store):
     assert "Test Data Provisioning" in reply  # source attribution
 
 
+def test_definitional_question_is_grounded_in_overview(built_store):
+    """"What is X?" (no section keyword) answers from X's Overview, grounded."""
+    reply = handle("What is the User Story Analyser?", use_llm=False)
+    # Drawn from the User Story Analyser's Overview section.
+    assert "reviews a user story" in reply.lower()
+    # Attributed to that agent's Overview.
+    assert "Source: User Story Analyser Agent — Overview" in reply
+
+
 def test_missing_data_is_honest_not_fabricated(built_store):
     reply = handle("What hardware does the User Story Analyser need?", use_llm=False)
     assert "don't have" in reply.lower()

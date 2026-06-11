@@ -56,12 +56,25 @@ _SECTION_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"\boverview\b|\bwhat (does|is) .*\bdo\b|\bwhat can .*\bdo\b|\bpurpose\b|\bsummary\b", re.IGNORECASE), "Overview"),
 ]
 
+# Definitional phrasings ("what is X", "tell me about X", "describe X", ...) name
+# no section, but they're asking what the agent *is* — i.e. its Overview. Checked
+# only AFTER the specific-section patterns above, so "what are the inputs" still
+# resolves to Inputs; bare definitional questions fall through to Overview.
+_DEFINITIONAL_RE = re.compile(
+    r"\bwhat(?:'s| is| are)\b|\btell me about\b|\bdescribe\b|\bwho is\b"
+    r"|\bexplain\b|\bsummar(?:y|ise|ize)\b|\boverview\b|\babout\b",
+    re.IGNORECASE,
+)
+
 
 def detect_section(query: str) -> str | None:
     """Map a question to the section header it's about, or ``None``."""
+    text = query or ""
     for pattern, section in _SECTION_PATTERNS:
-        if pattern.search(query or ""):
+        if pattern.search(text):
             return section
+    if _DEFINITIONAL_RE.search(text):
+        return "Overview"
     return None
 
 
@@ -178,6 +191,15 @@ def answer_question(
 
     agent_id = find_agent(query)
     section = detect_section(query)
+
+    # Defense-in-depth: if a named agent is asked about definitionally but no
+    # section was detected, scope to Overview rather than risk retrieving an
+    # unrelated section and tripping the grounding gate. Guarded on definitional
+    # phrasing so genuine missing-info questions are NOT masked — they keep their
+    # section (or None) and the gate stays free to fire honestly.
+    if agent_id and section is None and _DEFINITIONAL_RE.search(query or ""):
+        section = "Overview"
+
     where = _build_where(agent_id, section)
 
     hits = search_fn(query, k=k, where=where)

@@ -89,16 +89,23 @@ _RECOMMEND_RE = re.compile(
 )
 
 # Attribute words that signal a question about an agent's documented details.
+# Includes definitional phrasings ("what is X", "tell me about X", "describe X",
+# "who is X", "explain X", "summarise X") so a plain "What is the User Story
+# Analyser?" reads as an info lookup, not a fall-through to clarify/recommend.
+# (Naming a catalog agent already short-circuits to "info" below; this keeps the
+# info signal honest for the un-named case too.)
 _INFO_ATTR_RE = re.compile(
     r"\b(autonomy|autonomous|inputs?|outputs?|triggers?|webhook|deploy(?:ment)?"
-    r"|hardware|software|requirements?|limitations?|what does|what is|what are"
-    r"|what'?s|tell me about|how does|does it)\b",
+    r"|hardware|software|requirements?|limitations?|overview|what does|what is|what are"
+    r"|what'?s|tell me about|describe|who is|explain|summar(?:y|ise|ize)"
+    r"|how does|does it)\b",
     re.IGNORECASE,
 )
 
-# Is the message phrased as a question at all?
+# Is the message phrased as a question at all? (definitional verbs included so
+# "Describe X" / "Explain X" without a "?" still count as questions.)
 _QUESTIONY_RE = re.compile(
-    r"\?|^\s*(what|which|who|how|does|do|is|are|can|list|tell)\b",
+    r"\?|^\s*(what|which|who|how|does|do|is|are|can|list|tell|describe|explain|summar\w*)\b",
     re.IGNORECASE,
 )
 

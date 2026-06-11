@@ -42,6 +42,20 @@ def test_detect_intent(message, expected):
 
 
 @pytest.mark.parametrize(
+    "message",
+    [
+        # Definitional questions about a named catalog agent -> info, not clarify.
+        "What is the User Story Analyser?",
+        "Tell me about Test Data Provisioning",
+        "Describe the Test Script Generator",
+        "What's SmartTDM AgenticDC?",
+    ],
+)
+def test_definitional_question_about_named_agent_is_info(message):
+    assert detect_intent(message, use_llm=False) == "info"
+
+
+@pytest.mark.parametrize(
     "message,expected_id",
     [
         ("What does Test Data Provisioning output?", "test-data-provisioning"),
