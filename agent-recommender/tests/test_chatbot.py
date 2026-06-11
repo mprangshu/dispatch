@@ -56,12 +56,16 @@ def test_info_answer_is_grounded_in_the_right_section(built_store):
     assert "Test Data Provisioning" in reply  # source attribution
 
 
-def test_deployment_question_is_grounded(built_store):
-    # The Deployment fields now carry real (dummy) data, so a hardware question is
-    # answered from that section and attributed to it. (The grounding gate that
-    # produces an honest "I don't have that" for *empty* sections is still covered
-    # by the stub-based tests in test_info.py / test_llm.py, which don't depend on
-    # the live catalog content.)
+def test_definitional_question_is_grounded_in_overview(built_store):
+    """"What is X?" (no section keyword) answers from X's Overview, grounded."""
+    reply = handle("What is the User Story Analyser?", use_llm=False)
+    # Drawn from the User Story Analyser's Overview section.
+    assert "reviews a user story" in reply.lower()
+    # Attributed to that agent's Overview.
+    assert "Source: User Story Analyser Agent — Overview" in reply
+
+
+def test_missing_data_is_honest_not_fabricated(built_store):
     reply = handle("What hardware does the User Story Analyser need?", use_llm=False)
     assert "vCPU" in reply or "RAM" in reply
     assert "Source:" in reply  # grounded answers carry a source attribution

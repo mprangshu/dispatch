@@ -51,10 +51,47 @@ def _sec_hit(agent_id: str, name: str, section: str, body: str, score: float = 0
         ("How is it triggered?", "Triggers"),
         ("What are its limitations?", "Limitations"),
         ("I need to automate UI tests", None),
+        # Definitional phrasings (no section keyword) -> Overview.
+        ("what is the user story analyser", "Overview"),
+        ("Tell me about Test Data Provisioning", "Overview"),
+        ("Describe the Test Script Generator", "Overview"),
+        ("What does the User Story Analyser do?", "Overview"),
     ],
 )
 def test_detect_section(query, expected):
     assert detect_section(query) == expected
+
+
+def test_definitional_question_answers_from_overview():
+    """"Tell me about X" has no section keyword -> answer from the Overview."""
+    body = (
+        "Test Data Provisioning provisions ready-to-use test data for the test "
+        "cases linked to a User Story ID, mining the TDR and generating synthetic "
+        "data, then exports it as CSV or JSON."
+    )
+    hit = _sec_hit("test-data-provisioning", "Test Data Provisioning", "Overview", body)
+    captured = {}
+
+    def stub(query, k=5, where=None):
+        captured["where"] = where
+        return [hit]
+
+    res = answer_question(
+        "Tell me about Test Data Provisioning",
+        use_llm=False,
+        search_fn=stub,
+    )
+
+    assert res["grounded"] is True
+    assert "provisions ready-to-use test data" in res["answer"]
+    assert res["sources"] and res["sources"][0].section == "Overview"
+    # Scoped to the agent's Overview section via the metadata filter.
+    assert captured["where"] == {
+        "$and": [
+            {"agent_id": "test-data-provisioning"},
+            {"section": "Overview"},
+        ]
+    }
 
 
 # ---------------------------------------------------------------------------
