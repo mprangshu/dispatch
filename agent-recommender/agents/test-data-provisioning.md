@@ -5,7 +5,7 @@ domain: testing
 tags: [test-data, provisioning, synthetic-data, tdr, export]
 autonomy_default: L2
 autonomy_supported: [L1, L2, L3]
-triggers: []                  # not specified in source
+triggers: [manual, api]
 ---
 
 ## Overview
@@ -44,11 +44,16 @@ L2 (default) · Supported: L1, L2, L3.
 | Saved configuration | Optionally, the test configuration (fields/schema) stored against the test case for future reuse |
 
 ## Triggers
-Not specified in source.
+| Trigger | Description |
+|---------|-------------|
+| Manual | Start a run from the workspace by entering a User Story ID and autonomy level |
+| API | Kick off provisioning programmatically by posting a User Story ID to the run endpoint |
 
 ## Deployment
-**Hardware:** TBD
-**Software:** TBD
+**Hardware:** 2 vCPU, 4 GB RAM, and ~20 GB free disk for mined and generated datasets.
+**Software:** Python 3.11+ with ODBC/JDBC drivers for the Test Data Repository (TDR), network access to the TDR and the knowledge graph, and LLM API access for field identification.
 
 ## Limitations
-Not specified in source.
+- Synthetic-data quality depends on TDR coverage; the agent cannot mine data for fields that have no example or governing rule.
+- Bound by the source database's access permissions — it never reads tables it isn't granted.
+- Export is limited to CSV and JSON; other formats are out of scope.

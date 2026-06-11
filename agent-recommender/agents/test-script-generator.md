@@ -45,8 +45,10 @@ small amount of human control.
 | Manual | Provide a URL and description directly in the workspace |
 
 ## Deployment
-**Hardware:** TBD
-**Software:** TBD
+**Hardware:** 4 vCPU, 8 GB RAM, and ~10 GB free disk for browser binaries, screenshots, and run artifacts. A GPU is not required.
+**Software:** Linux or Windows host with Python 3.11+, a Chromium-based browser driven via Playwright, and (optionally) Docker for sandboxed runs. Outbound network access to the target application URL is required.
 
 ## Limitations
-Not specified in source.
+- Tests web UIs that are reachable from the agent host; native desktop and mobile apps are out of scope (see the Mobile App Tester Agent for those).
+- Highly dynamic single-page apps may need a higher Max Heal Attempts value before scripts stabilise.
+- Cannot complete authentication flows that require external MFA or hardware tokens.

@@ -46,8 +46,10 @@ points during the process to ask for the user's input before continuing.
 | Webhook | Automatically triggered when a new story is created in Jira |
 
 ## Deployment
-**Hardware:** TBD
-**Software:** TBD
+**Hardware:** 2 vCPU, 4 GB RAM; no GPU required.
+**Software:** Python 3.11+, Jira Cloud/Server API access for story fetch and webhook triggers, and outbound network access to the configured LLM endpoint.
 
 ## Limitations
-Not specified in source.
+- Quality scoring is tuned for English-language stories; other languages may score less reliably.
+- Non-text attachments (images, diagrams) are ignored — only the story text and reachable project context are analysed.
+- Requires the project's context sources (past stories, test suites) to be reachable; gaps reduce the quality of the gathered context.

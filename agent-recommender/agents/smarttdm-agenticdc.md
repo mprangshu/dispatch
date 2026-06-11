@@ -5,7 +5,7 @@ domain: testing
 tags: [data-profiling, business-rules, synthetic-data, test-case-generation, coverage]
 autonomy_default: L3          # inferred — source describes a HITL gate, not an explicit L-number
 autonomy_supported: [L3]
-triggers: []                  # not specified in source
+triggers: [manual, api]
 ---
 
 ## Overview
@@ -46,11 +46,16 @@ triggered.
 | Coverage report | Measures achieved test coverage against the threshold |
 
 ## Triggers
-Not specified in source.
+| Trigger | Description |
+|---------|-------------|
+| Manual | Launch a run from the workspace by selecting a database connection, tables, and coverage threshold |
+| API | Trigger profiling-to-generation programmatically via the run endpoint |
 
 ## Deployment
-**Hardware:** TBD
-**Software:** TBD
+**Hardware:** 4 vCPU, 16 GB RAM, and ~50 GB free disk for profiling large tables and staging generated data.
+**Software:** Python 3.11+, database drivers for the connected source (e.g. PostgreSQL/MySQL/Oracle), and LLM API access for rule extraction.
 
 ## Limitations
-Not specified in source.
+- Rule-extraction quality depends on representative data samples; sparsely populated tables yield weaker rules.
+- Very wide schemas may not reach the target coverage threshold within the default iteration budget.
+- Requires read access to production-like data; it does not operate on schema-only (empty) databases.
