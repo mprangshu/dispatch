@@ -17,6 +17,9 @@ from __future__ import annotations
 import os
 
 from . import config
+from .logger import get_logger
+
+log = get_logger(__name__)
 
 # Load .env so GEMINI_API_KEY is available without exporting it manually.
 try:  # python-dotenv is a declared dependency, but don't hard-fail without it.
@@ -57,8 +60,14 @@ def generate(prompt: str, system: str | None = None, model: str | None = None) -
     ``config.MODEL``. Temperature is kept moderate (0.5) for stable, grounded
     output.
     """
+    log.debug("LLM CALL: model=%s temperature=0.5", model or config.MODEL)
+    if system:
+        log.debug("LLM SYSTEM PROMPT: %s", system)
+    log.debug("LLM USER PROMPT: %s", prompt)
+
     client = _client_or_none()
     if client is None:
+        log.info("LLM RESULT: None — fallback")
         return None
     try:
         from google.genai import types
@@ -72,6 +81,8 @@ def generate(prompt: str, system: str | None = None, model: str | None = None) -
             config=cfg,
         )
         text = (response.text or "").strip()
+        log.info("LLM RESULT: %s", text[:150] if text else "None — fallback")
         return text or None
     except Exception:  # pragma: no cover - network/quota/parse errors -> fall back
+        log.info("LLM RESULT: None — fallback")
         return None

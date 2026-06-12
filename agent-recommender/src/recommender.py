@@ -31,7 +31,13 @@ from typing import Callable
 
 from . import config
 from .llm import generate
+from .logger import get_logger
 from .retriever import Hit, search_agents
+
+log = get_logger(__name__)
+
+# Brackets the exact prompt in the trace (manager-facing), like the info path.
+_RULE = "─────────────────────────────────"
 
 # ---------------------------------------------------------------------------
 # Query -> implied metadata filter
@@ -78,16 +84,23 @@ def recommend(
     search_fn: SearchFn | None = None,
 ) -> dict:
     """Recommend the best-fitting agent(s) for ``query`` (handoff section 7)."""
+    log.info("RECOMMENDATION PATH STARTED")
     k = k or config.RECOMMEND_TOP_K
     search_fn = search_fn or search_agents
     where = detect_filter(query)
+    log.info("FILTER DETECTED: %s", where or "none")
     hits = search_fn(query, k=k, where=where)
+
+    log.debug("CANDIDATE AGENTS (%d hits):", len(hits))
+    for rank, h in enumerate(hits, 1):
+        log.debug("  #%d | agent=%s | score=%.4f", rank, h.name, h.score)
 
     # Nothing came back (e.g. a filter that matched no agent), or — for an
     # unfiltered query — the best hit is too weak to be a real match
     # (out-of-scope). A filter is itself strong evidence of intent, so we trust
     # it and skip the semantic floor when one was applied.
     if not hits or (where is None and hits[0].score < config.NO_MATCH_SCORE):
+        log.info("DECISION: no match")
         return {
             "agents": [],
             "explanation": _no_match_explanation(where),
@@ -105,12 +118,14 @@ def recommend(
     ]
 
     if len(shortlist) > 1:
+        log.info("DECISION: shortlist (%d agents)", len(shortlist))
         return {
             "agents": shortlist,
             "explanation": _explain_shortlist(query, shortlist, use_llm),
             "ambiguous": True,
         }
 
+    log.info("DECISION: single match — %s", top.name)
     return {
         "agents": [top],
         "explanation": _explain_single(query, top, use_llm),
@@ -148,13 +163,18 @@ def _overview_snippet(hit: Hit, limit: int = 200) -> str:
 def _explain_single(query: str, hit: Hit, use_llm: bool) -> str:
     """One-agent explanation: LLM if available, else a grounded template."""
     if use_llm:
-        text = generate(
+        prompt = (
             f"User need: {query}\n\n"
             f"Recommended agent description:\n{hit.text}\n\n"
             "In one or two sentences, explain why this agent fits the user's "
-            "need. Start with the agent's name. Use only the description above.",
-            system=_SYSTEM,
+            "need. Start with the agent's name. Use only the description above."
         )
+        log.info("PROMPT SENT TO LLM:")
+        log.info(_RULE)
+        log.info(prompt)
+        log.info(_RULE)
+        text = generate(prompt, system=_SYSTEM)
+        log.info("LLM RESPONSE: %s", text if text else "None — using fallback")
         if text:
             return text
 
@@ -172,14 +192,19 @@ def _explain_shortlist(query: str, shortlist: list[Hit], use_llm: bool) -> str:
     """Shortlist explanation when several agents fit comparably well."""
     if use_llm:
         blocks = "\n\n---\n\n".join(f"{h.name}:\n{h.text}" for h in shortlist)
-        text = generate(
+        prompt = (
             f"User need: {query}\n\n"
             f"Candidate agents:\n{blocks}\n\n"
             "Several agents could fit. In one short sentence each, say what each "
             "candidate does, then ask one clarifying question to decide between "
-            "them. Use only the descriptions above.",
-            system=_SYSTEM,
+            "them. Use only the descriptions above."
         )
+        log.info("PROMPT SENT TO LLM:")
+        log.info(_RULE)
+        log.info(prompt)
+        log.info(_RULE)
+        text = generate(prompt, system=_SYSTEM)
+        log.info("LLM RESPONSE: %s", text if text else "None — using fallback")
         if text:
             return text
 

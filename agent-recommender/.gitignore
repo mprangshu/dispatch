@@ -21,3 +21,6 @@ env/
 
 # ChromaDB persist directory
 .chroma/
+
+# Runtime logs
+logs/

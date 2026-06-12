@@ -27,6 +27,9 @@ from functools import lru_cache
 from . import config
 from .llm import generate
 from .loader import load_agents
+from .logger import get_logger
+
+log = get_logger(__name__)
 
 # ---------------------------------------------------------------------------
 # Agent-name detection (data-driven from the catalog)
@@ -181,6 +184,9 @@ def detect_intent(query: str, *, use_llm: bool = False) -> str:
         return "clarify"
     if use_llm:
         label = _classify_llm(text)
+        log.debug("INTENT CLASSIFICATION: llm returned=%s", label)
         if label is not None:
             return label
-    return _classify_rules(text)
+    result = _classify_rules(text)
+    log.debug("INTENT CLASSIFICATION: rule-based=%s", result)
+    return result

@@ -19,7 +19,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from .logger import get_logger
 from .store import get_client, get_section_collection, get_summary_collection
+
+log = get_logger(__name__)
 
 
 @dataclass
@@ -61,6 +64,20 @@ def _to_hits(result) -> list[Hit]:
     return hits
 
 
+def _log_search(search_type: str, query: str, where: dict | None, hits: list[Hit]) -> None:
+    """Emit the per-call retrieval trace (query, filter, and ranked hits)."""
+    log.debug("SEARCH TYPE: %s", search_type)
+    log.debug("QUERY: %s", query)
+    log.debug("WHERE FILTER: %s", where)
+    log.debug("RESULTS (%d hits):", len(hits))
+    for rank, hit in enumerate(hits, 1):
+        preview = (hit.text or "").replace("\n", " ")[:80]
+        log.debug(
+            "  #%d | agent=%s | section=%s | score=%.4f | text preview: %s...",
+            rank, hit.agent_id, hit.section, hit.score, preview,
+        )
+
+
 def search_agents(query: str, k: int = 3, where: dict | None = None) -> list[Hit]:
     """Semantic search over agent-summary records (the recommendation path).
 
@@ -74,7 +91,9 @@ def search_agents(query: str, k: int = 3, where: dict | None = None) -> list[Hit
         n_results=k,
         where=where or None,
     )
-    return _to_hits(result)
+    hits = _to_hits(result)
+    _log_search("agent_summaries", query, where, hits)
+    return hits
 
 
 def search_sections(query: str, k: int = 5, where: dict | None = None) -> list[Hit]:
@@ -92,4 +111,6 @@ def search_sections(query: str, k: int = 5, where: dict | None = None) -> list[H
         n_results=k,
         where=where or None,
     )
-    return _to_hits(result)
+    hits = _to_hits(result)
+    _log_search("agent_sections", query, where, hits)
+    return hits

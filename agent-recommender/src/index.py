@@ -27,6 +27,7 @@ from pathlib import Path
 
 from . import config
 from .loader import load_agents
+from .logger import get_logger
 from .models import Agent
 from .store import (
     get_client,
@@ -35,6 +36,8 @@ from .store import (
     get_summary_collection,
     refresh_catalog_caches,
 )
+
+log = get_logger(__name__)
 
 # The shared Chroma client, embedding function, and collection accessors now
 # live in ``store.py`` as process-level singletons (so they're not re-created on
@@ -91,7 +94,9 @@ def build_index(agents_dir: str | Path | None = None, chroma_path: str | Path | 
     Idempotent: safe to re-run; it rebuilds both collections from scratch.
     """
     agents_dir = Path(agents_dir) if agents_dir is not None else config.AGENTS_DIR
+    log.info("INDEXING STARTED: agents_dir=%s", agents_dir)
     agents = load_agents(agents_dir)
+    log.info("LOADED %d agents", len(agents))
 
     client = get_client(chroma_path)
     summaries = _reset_collection(client, config.SUMMARY_COLLECTION)
@@ -112,6 +117,7 @@ def build_index(agents_dir: str | Path | None = None, chroma_path: str | Path | 
         n_summaries += 1
 
         # One fine section-chunk record per body section.
+        agent_chunks = 0
         for section, body in agent.sections.items():
             if not body.strip():
                 continue
@@ -123,11 +129,16 @@ def build_index(agents_dir: str | Path | None = None, chroma_path: str | Path | 
                 metadatas=[{**base_meta, "section": section}],
             )
             n_sections += 1
+            agent_chunks += 1
+        log.info("AGENT INDEXED: %s — %d section chunks", agent.name, agent_chunks)
 
     # The catalog just changed: drop the cached collection handles and the
     # router/chatbot name caches so a running process sees the new agents
     # immediately, with no restart (cache invalidation after re-index).
     refresh_catalog_caches()
+    log.info(
+        "INDEXING COMPLETE: %d summary + %d section records", n_summaries, n_sections
+    )
 
     return {
         "agents": len(agents),

@@ -36,8 +36,11 @@ from functools import lru_cache
 from . import config
 from .info import answer_question
 from .loader import load_agents
+from .logger import get_logger
 from .recommender import recommend
 from .router import detect_intent
+
+log = get_logger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -120,18 +123,29 @@ def handle(message: str, *, use_llm: bool = True) -> str:
     each falls back to its grounded, rule-based behavior when the LLM is
     unavailable, so the whole chatbot can still run deterministically offline.
     """
+    log.info("═══ NEW MESSAGE ═══")
+    log.info("INPUT: %s", message)
+
     text = (message or "").strip()
     if not text:
-        return _clarify_reply()
+        log.info("INTENT DETECTED: clarify (empty input)")
+        reply = _clarify_reply()
+        log.info("REPLY: %s", reply)
+        return reply
 
     # Intent detection always uses the deterministic router — it's accurate on
     # the catalog's phrasing and costs no API call. ``use_llm`` is reserved for
     # the answer/explanation generation in the paths below, which halves the
     # number of LLM calls per message.
     intent = detect_intent(text)
+    log.info("INTENT DETECTED: %s", intent)
 
     if intent == "recommend":
-        return _format_recommendation(recommend(text, use_llm=use_llm))
-    if intent == "info":
-        return _format_info(answer_question(text, use_llm=use_llm))
-    return _clarify_reply()
+        reply = _format_recommendation(recommend(text, use_llm=use_llm))
+    elif intent == "info":
+        reply = _format_info(answer_question(text, use_llm=use_llm))
+    else:
+        reply = _clarify_reply()
+
+    log.info("REPLY: %s", reply)
+    return reply

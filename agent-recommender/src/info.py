@@ -32,10 +32,16 @@ import re
 from typing import Callable
 
 from .llm import generate
+from .logger import get_logger
 from .retriever import Hit, search_sections
 from .router import find_agent
 
+log = get_logger(__name__)
+
 INFO_TOP_K = 5  # section-chunk hits to retrieve (matches the §7 default)
+
+# A horizontal rule that brackets the exact prompt in the trace (manager-facing).
+_RULE = "─────────────────────────────────"
 
 SearchFn = Callable[..., list[Hit]]
 
@@ -166,11 +172,18 @@ def _llm_answer(query: str, hits: list[Hit]) -> str | None:
     context = "\n\n---\n\n".join(
         f"[{h.name} — {h.section}]\n{_strip_prefix(h)}" for h in hits
     )
-    return generate(
+    prompt = (
         f"Question: {query}\n\nDocumentation excerpts:\n{context}\n\n"
-        "Answer the question using ONLY the excerpts above. Be concise.",
-        system=_SYSTEM,
+        "Answer the question using ONLY the excerpts above. Be concise."
     )
+    # The manager explicitly wants to see the exact prompt (logged at INFO).
+    log.info("PROMPT SENT TO LLM:")
+    log.info(_RULE)
+    log.info(prompt)
+    log.info(_RULE)
+    response = generate(prompt, system=_SYSTEM)
+    log.info("LLM RESPONSE: %s", response if response else "None — using fallback")
+    return response
 
 
 # ---------------------------------------------------------------------------
@@ -186,11 +199,14 @@ def answer_question(
     search_fn: SearchFn | None = None,
 ) -> dict:
     """Answer a question about an agent, grounded strictly in retrieved text."""
+    log.info("RAG PATH STARTED")
     k = k or INFO_TOP_K
     search_fn = search_fn or search_sections
 
     agent_id = find_agent(query)
+    log.info("AGENT IDENTIFIED: %s", agent_id or "none — using retrieval")
     section = detect_section(query)
+    log.info("SECTION TARGETED: %s", section or "none")
 
     # Defense-in-depth: if a named agent is asked about definitionally but no
     # section was detected, scope to Overview rather than risk retrieving an
@@ -201,6 +217,7 @@ def answer_question(
         section = "Overview"
 
     where = _build_where(agent_id, section)
+    log.info("WHERE FILTER BUILT: %s", where)
 
     hits = search_fn(query, k=k, where=where)
     # A tight section filter can miss; widen to the agent, then the whole store.
@@ -210,6 +227,7 @@ def answer_question(
         hits = search_fn(query, k=k, where=None)
 
     if not hits:
+        log.info("GROUNDING CHECK: False — no matching content retrieved")
         return {"answer": _NO_INFO, "sources": [], "grounded": False}
 
     # Prefer hits in the targeted section; otherwise rank as returned.
@@ -217,16 +235,29 @@ def answer_question(
     top = relevant[0]
     body = _strip_prefix(top)
 
+    log.debug("RETRIEVED CHUNKS (%d):", len(relevant))
+    for h in relevant:
+        log.debug("  chunk text: %s", h.text)
+
     # The grounding gate: if the section we'd answer from has no real content,
     # be honest rather than guess (the TBD / "not specified" case).
     if _looks_missing(body):
-        return {"answer": _missing_message(top), "sources": [top], "grounded": False}
+        log.info("GROUNDING CHECK: False — section is TBD / not specified / empty")
+        message = _missing_message(top)
+        log.info("ANSWER (grounded=False): %s", message)
+        return {"answer": message, "sources": [top], "grounded": False}
+
+    log.info("GROUNDING CHECK: True — section has real content")
 
     if use_llm:
         text = _llm_answer(query, relevant)
         if text:
             if _INSUFFICIENT_RE.search(text):
+                log.info("ANSWER (grounded=False): LLM reported INSUFFICIENT_CONTEXT")
                 return {"answer": _missing_message(top), "sources": relevant, "grounded": False}
+            log.info("ANSWER (grounded=True): %s", text)
             return {"answer": text, "sources": relevant, "grounded": True}
 
-    return {"answer": _fallback_answer(top, body), "sources": [top], "grounded": True}
+    answer = _fallback_answer(top, body)
+    log.info("ANSWER (grounded=True): %s", answer)
+    return {"answer": answer, "sources": [top], "grounded": True}
