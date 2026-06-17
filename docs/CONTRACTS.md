@@ -73,6 +73,17 @@ refresh_catalog_caches()               # after a re-index: drop cached collectio
                                        #   router._agent_terms / chatbot.available_agent_names lru_caches
 ```
 
+## Logging (cross-cutting)
+
+```python
+# logger.py
+get_logger(name: str | None = None) -> logging.Logger
+# Returns a logger under the "agent_chatbot" base. Two handlers, configured once:
+#   console — INFO+,  "[STEP] <message>"          (the live step-by-step trace)
+#   file    — DEBUG+, logs/agent_chatbot.log       (full record incl. chunks/prompts)
+# Call as get_logger(__name__) at module top. Never logs secrets (no API key).
+```
+
 ## Retriever (Phase 2 provides; Phases 3 & 4 consume)
 
 ```python

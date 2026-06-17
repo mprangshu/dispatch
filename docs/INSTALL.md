@@ -82,7 +82,7 @@ tunables: [CONFIGURATION.md](CONFIGURATION.md).)
 pytest
 ```
 
-You should see **109 passed**. The tests run offline and need no API key — what
+You should see **101 passed**. The tests run offline and need no API key — what
 each one covers is in [TESTING.md](TESTING.md).
 
 > **First-run note (applies to step 6 and 7):** the first time anything builds or

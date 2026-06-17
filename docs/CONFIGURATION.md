@@ -76,6 +76,19 @@ Copy `.env.example` → `.env` (gitignored). Recognized keys:
 `TOP_K`) as documentation of intent. **Note:** `src/config.py` currently sets these
 as constants, so editing `config.py` is the reliable way to change them today.
 
+## Logging
+
+Logging is wired in code, not via `config.py` — `src/logger.py` configures it once
+per process. The defaults:
+
+| Aspect | Value | Notes |
+|--------|-------|-------|
+| Console handler | INFO+, `[STEP] <message>` | The live step-by-step trace. |
+| File handler | DEBUG+, `<repo>/agent-recommender/logs/agent_chatbot.log` | Full record incl. retrieved chunks & exact prompts. `logs/` is created on first use and **gitignored**. |
+| Secrets | Never logged | The API key is never passed to a logger; `tests/test_logging.py` enforces this. |
+
+To change levels/format/destination, edit `src/logger.py` (the single place).
+
 ---
 
 ## "I changed a setting — what do I re-run?"

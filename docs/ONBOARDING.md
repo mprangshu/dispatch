@@ -53,6 +53,7 @@ responsibility; the public import surface is
 | [`api.py`](../agent-recommender/api.py) | FastAPI backend over `src.handle` | 7 |
 | [`frontend/`](../agent-recommender/frontend/) | Streamlit web UI (`app_ui.py`) + HTTP client (`api_client.py`); talks to `api.py` only, never `src` | 8 |
 | [`src/config.py`](../agent-recommender/src/config.py) | Paths, model names, `TOP_K`, thresholds | — |
+| [`src/logger.py`](../agent-recommender/src/logger.py) | Structured pipeline logging — `get_logger()`; console (INFO, `[STEP]`) + file (`logs/agent_chatbot.log`, DEBUG); never logs secrets | — |
 | [`tests/`](../agent-recommender/tests/) + [`frontend/tests/`](../agent-recommender/frontend/tests/) | One `test_*.py` per module + E2E + mocked-LLM + API + store-caching tests; `frontend/tests/test_ui.py` mocks the HTTP layer | all |
 
 ## 3. Where to look when…
@@ -67,6 +68,9 @@ responsibility; the public import surface is
 - *"How is a reply formatted?"* → `chatbot.py` `_format_recommendation` /
   `_format_info` / `_clarify_reply`.
 - *"What's the exact signature of …?"* → [CONTRACTS.md](CONTRACTS.md).
+- *"What actually happened during a request?"* → the step-by-step trace on the
+  console (`[STEP] …`) and the full DEBUG record (retrieved chunks, exact prompts)
+  in `logs/agent_chatbot.log`. The mechanism: `src/logger.py`.
 
 ## 4. Common changes → which doc tells you how
 

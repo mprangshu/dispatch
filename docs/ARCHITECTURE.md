@@ -169,7 +169,25 @@ For zero-touch updates, **`scripts/watch_agents.py`** (watchdog) watches `agents
 and runs `build_index()` + `refresh_catalog_caches()` automatically whenever a `.md`
 file is added, modified, or deleted.
 
-## 9. Key dependencies
+## 9. Logging & tracing
+
+Every pipeline module logs through one helper — **`src/logger.py`** (`get_logger(__name__)`)
+— so the whole request is traceable. Two handlers are configured once per process:
+
+- **Console** — INFO and above, `[STEP] <message>`: the step-by-step trace
+  (new message → intent → agent identified → prompt sent → grounding check → reply)
+  a manager can watch live.
+- **File** — `logs/agent_chatbot.log`, DEBUG and above, with timestamp/module/level:
+  the full record, including the verbose detail (retrieved chunk text, exact prompts)
+  that's too noisy for the console. `logs/` is created on first use and is gitignored.
+
+The full prompt text is logged at INFO (intentionally visible in the trace); full
+chunk text is logged at DEBUG (file only). **Secrets are never logged** — the API key
+is never passed to a logger, only prompt/answer/agent text flows through it; a test
+(`tests/test_logging.py`) asserts no record contains a key. On a non-UTF-8 console
+(Windows cp1252) the box-drawing glyphs degrade to `?` rather than raising.
+
+## 10. Key dependencies
 
 | Package | Role |
 |---------|------|

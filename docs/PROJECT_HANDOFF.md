@@ -23,7 +23,7 @@ that agent's doc. It must never invent facts.
 
 ## 2. Current status
 
-**Complete — Phases 1–8 implemented and tested (109 passing): the core, CLI, HTTP
+**Complete — Phases 1–8 implemented and tested (101 passing): the core, CLI, HTTP
 API, and Streamlit web UI are all built. The one open data item is the `TBD`
 Deployment fields.**
 
@@ -39,7 +39,8 @@ Deployment fields.**
 | Phase 7 — FastAPI backend `api.py` (+ `tests/test_api.py`) | ✅ Done |
 | Phase 8 — Streamlit UI `frontend/` over the API (+ `frontend/tests/test_ui.py`) | ✅ Done |
 | Hardening — cached Chroma client/embedding (`store.py`), cache invalidation after re-index, `scripts/watch_agents.py` auto-reindexer (+ `tests/test_store.py`) | ✅ Done |
-| Test suite | ✅ 109 passing (deterministic/mocked; CI needs no key) |
+| Observability — structured pipeline logging (`src/logger.py`): console step-trace + `logs/agent_chatbot.log`, no secrets (+ `tests/test_logging.py`) | ✅ Done |
+| Test suite | ✅ 101 passing (deterministic/mocked; CI needs no key) |
 | Deployment (hardware/software) doc fields | ⬜ Still `TBD` — info path correctly answers "not available" until filled |
 
 ## 3. Build order (how the phases depend)

@@ -111,6 +111,7 @@ restart needed — the wrapper recovers automatically on the next successful cal
 | New agent `.md` not showing up in answers | Re-index: `python app.py index`. (`GET /agents` reads live and updates without re-index; **retrieval** needs the re-index.) A running server/CLI picks up the new agent on the next request after the re-index — no restart (`build_index()` calls `store.refresh_catalog_caches()`). To automate this, run `python scripts/watch_agents.py`. |
 | Re-indexed but a long-running process still serves the old catalog | It shouldn't — `build_index()` invalidates the caches. If you indexed in a *separate* process from the running server, that server won't see it until it re-indexes itself; re-index in-process (or via the watcher), or restart it. |
 | A new `.md` breaks loading | `pytest tests/test_loader.py` — it runs against the real catalog and points at the malformed file. Check the YAML frontmatter. |
+| "Why did it answer that?" | Watch the console step-trace (`[STEP] …`) or open `logs/agent_chatbot.log` for the full DEBUG record — intent, retrieved chunks, the exact prompt sent, and the grounding verdict. (Logging is set up in `src/logger.py`; no secrets are ever written.) |
 | Tests fail on a fresh machine, first run only | The embedding model download may have been interrupted — re-run `pytest` once it completes (~1 min). |
 | PowerShell won't activate the venv | `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`, then re-activate. |
 | CORS error from a browser front end | CORS is open (`*`) by design; if locked down for prod, add your front-end origin to `api.py`. |
@@ -120,7 +121,7 @@ restart needed — the wrapper recovers automatically on the next successful cal
 ```bash
 curl -s localhost:8000/health     # {"status":"ok","llm_available":<bool>}
 curl -s localhost:8000/agents     # the live catalog — confirms agents/ is readable
-pytest -q                         # full offline verification (109 passing)
+pytest -q                         # full offline verification (101 passing)
 python scripts/verify_llm.py      # LLM on-vs-off A/B (needs store built)
 ```
 
