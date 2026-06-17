@@ -4,6 +4,11 @@ How the Agent Recommender & Q&A Chatbot is put together, and *why* it's shaped
 this way. Read [PROBLEM_STATEMENT.md](PROBLEM_STATEMENT.md) first for the
 behavior spec; this doc explains the structure that delivers it.
 
+![Architecture diagram](Architecture.svg)
+
+> Diagram source: [Architecture.svg](Architecture.svg) — solid arrows are the
+> query/read path, dashed arrows are the ingestion/write path.
+
 ---
 
 ## 1. The one-paragraph mental model
