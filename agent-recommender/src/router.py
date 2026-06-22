@@ -66,17 +66,48 @@ def _agent_terms() -> tuple[tuple[str, str], ...]:
     return tuple(terms)
 
 
+# Generic words that must never, on their own, resolve to an agent — guards
+# against a bare "agent" (or "test"/"testing") fuzzy-matching the wrong agent
+# from a non-catalog name like "Performance Testing Agent" (Bug 3).
+_GENERIC_TERMS = {"agent", "agents", "test", "tests", "testing"}
+
+
 def find_agent(query: str) -> str | None:
     """Return the ``agent_id`` named in ``query``, or ``None``.
 
     A whole-phrase substring match on the catalog-derived terms; used to spot
-    "info" questions about a specific agent and to scope RAG retrieval.
+    "info" questions about a specific agent and to scope RAG retrieval. A match
+    only counts when the term is discriminating — at least 4 characters and not a
+    bare generic word — so a stray "agent" in a non-catalog name doesn't pull in
+    an unrelated agent.
     """
     text = (query or "").casefold()
     for term, agent_id in _agent_terms():
+        if len(term) < 4 or term in _GENERIC_TERMS:
+            continue
         if term in text:
             return agent_id
     return None
+
+
+def agent_exists(name_or_id: str) -> bool:
+    """Whether ``name_or_id`` refers to an agent in the live catalog.
+
+    Case-insensitive membership check against the same catalog-derived name
+    variants used by :func:`find_agent` (full name, the name without a trailing
+    "Agent", the ``agent_id``, and the id with hyphens as spaces). Matches in
+    either direction so a phrase the user typed ("Data Coverage") still resolves
+    to the stored variant ("data coverage agent"). Returns ``False`` for anything
+    not in the catalog — the basis for the recommendation path's "not in catalog"
+    grounding gate.
+    """
+    text = (name_or_id or "").strip().casefold()
+    if not text:
+        return False
+    for term, _agent_id in _agent_terms():
+        if term == text or term in text or text in term:
+            return True
+    return False
 
 
 # ---------------------------------------------------------------------------

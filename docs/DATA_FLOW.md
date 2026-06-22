@@ -83,6 +83,15 @@ How the rules decide ([src/router.py](../agent-recommender/src/router.py)):
 
 `recommender.recommend(query)` ([src/recommender.py](../agent-recommender/src/recommender.py)):
 
+0. **Not-in-catalog gate (pre-search).** If the query names a specific agent that
+   isn't in the catalog (e.g. "is there a Performance Testing Agent?"), return a
+   "not in catalog" message immediately *before* retrieval — `{ agents: [],
+   not_in_catalog: True }` with an honest "it may be in development or not yet
+   added" reply plus the available-agents list. This is the recommendation-path
+   analogue of the info path's grounding gate: better than recommending a
+   loosely-similar agent or a generic no-match. (`router.agent_exists` decides
+   membership; a named agent that *is* in the catalog falls through to normal
+   ranking.)
 1. **Implied filter.** `detect_filter` turns "fully autonomous" → `where={"autonomy_default":"L4"}`,
    or an explicit `L1`–`L4` directly. Else no filter.
 2. **Semantic search** over `agent_summaries` via `search_agents(query, k=RECOMMEND_TOP_K, where=...)`.

@@ -33,7 +33,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from . import config
+from . import config, recommender
 from .info import answer_question
 from .loader import load_agents
 from .logger import get_logger
@@ -66,7 +66,9 @@ def _agent_list_block() -> str:
     """A bulleted list of the catalog's agents (or a gentle note if empty)."""
     names = available_agent_names()
     if not names:
-        return ""
+        # EDGE CASE FIX: empty catalog -> state that no agents are available
+        # rather than returning a blank block (which silently dropped the line).
+        return "No agents are currently available in the catalog."
     return "Available agents:\n" + "\n".join(f"- {name}" for name in names)
 
 
@@ -78,6 +80,11 @@ def _agent_list_block() -> str:
 def _format_recommendation(result: dict) -> str:
     """Render a ``recommend`` result, listing the catalog on a no-match."""
     explanation = (result.get("explanation") or "").strip()
+    if result.get("not_in_catalog"):
+        # The user named an agent that isn't in the catalog. The message already
+        # embeds the available-agents list, so pass it straight through (no extra
+        # list, no source line, no ambiguous framing).
+        return explanation
     if not result.get("agents"):
         # No clear fit / out of scope (section 4.5): be honest and list options.
         block = _agent_list_block()
@@ -140,7 +147,18 @@ def handle(message: str, *, use_llm: bool = True) -> str:
     intent = detect_intent(text)
     log.info("INTENT DETECTED: %s", intent)
 
-    if intent == "recommend":
+    # Not-in-catalog precedence (Bugs 2 & B): if the user names a specific
+    # agent/capability that isn't in the catalog, answer honestly rather than
+    # letting the info path answer about a wrong agent (shared word) or a clarify
+    # reply swallow the question. Route through the recommendation path — which
+    # lists the catalog and, when asked, surfaces the closest match — UNLESS this
+    # is a plain info question, in which case the info path returns a short honest
+    # message (no agent list, so it can't echo a wrong agent's name — Bug 3).
+    missing = recommender._looks_like_specific_agent_request(text)
+
+    if intent == "recommend" or (
+        missing and (intent != "info" or recommender.asks_for_closest(text))
+    ):
         reply = _format_recommendation(recommend(text, use_llm=use_llm))
     elif intent == "info":
         reply = _format_info(answer_question(text, use_llm=use_llm))

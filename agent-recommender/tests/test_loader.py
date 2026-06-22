@@ -27,14 +27,14 @@ def test_all_agents_load():
     # all present rather than hard-coding an exact count (it's expected to grow).
     ids = {a.agent_id for a in agents}
     assert {
-        "smarttdm-agenticdc",
         "user-story-analyser",
         "test-data-provisioning",
         "test-script-generator",
-        "api-contract-validator",
-        "mobile-app-tester",
-        "security-scan-agent",
-        "accessibility-auditor",
+        "test-case-generation",
+        "test-case-review",
+        "data-coverage",
+        "defect-triaging",
+        "impact-analyzer-supervisor-l4",
     } <= ids
     assert len(agents) == len(ids)  # no duplicate ids
 
@@ -96,7 +96,7 @@ def test_summary_text_includes_name_overview_and_tags(agents_by_id):
     tdp = agents_by_id["test-data-provisioning"]
     summary = tdp.summary_text()
     assert tdp.name in summary
-    assert "provisions" in summary  # from the Overview section
+    assert "provisioned" in summary  # from the Overview section
     assert "synthetic-data" in summary  # from tags
 
 

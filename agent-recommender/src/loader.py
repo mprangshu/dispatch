@@ -42,7 +42,12 @@ def _split_frontmatter(text: str) -> tuple[dict, str]:
     if not match:
         return {}, text
     raw = match.group("frontmatter")
-    data = yaml.safe_load(raw) or {}
+    try:
+        data = yaml.safe_load(raw) or {}
+    except yaml.YAMLError:
+        # EDGE CASE FIX: malformed YAML frontmatter (e.g. an unterminated string)
+        # -> fall back to empty metadata/defaults instead of crashing the load.
+        data = {}
     if not isinstance(data, dict):
         data = {}
     return data, match.group("body")

@@ -62,7 +62,7 @@ def test_definitional_question_is_grounded_in_overview(built_store):
     # Drawn from the User Story Analyser's Overview section.
     assert "reviews a user story" in reply.lower()
     # Attributed to that agent's Overview.
-    assert "Source: User Story Analyser Agent — Overview" in reply
+    assert "Source: User Story Analyser — Overview" in reply
 
 
 def test_missing_data_is_honest_not_fabricated(built_store):

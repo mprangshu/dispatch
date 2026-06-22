@@ -115,7 +115,11 @@ def refresh_catalog_caches() -> None:
     # importing them at module top would be circular. By call time (a build has
     # run) they're fully initialized.
     from .chatbot import available_agent_names
+    from .recommender import _catalog_vocab
     from .router import _agent_terms
 
     _agent_terms.cache_clear()
     available_agent_names.cache_clear()
+    # EDGE CASE FIX: a re-index must also refresh the recommender's name/tag
+    # vocabulary (used by the not-in-catalog gate), else it serves a stale catalog.
+    _catalog_vocab.cache_clear()

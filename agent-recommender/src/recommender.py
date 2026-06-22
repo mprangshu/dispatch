@@ -27,10 +27,12 @@ the "stub your dependencies against the section-7 contract" working agreement.
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 from typing import Callable
 
-from . import config
+from . import config, router
 from .llm import generate
+from .loader import load_agents
 from .logger import get_logger
 from .retriever import Hit, search_agents
 
@@ -70,6 +72,242 @@ def detect_filter(query: str) -> dict | None:
 
 
 # ---------------------------------------------------------------------------
+# "Not in catalog" detection (the recommendation-path grounding gate)
+# ---------------------------------------------------------------------------
+
+# Words that mark a boundary of an agent *name* — determiners, question words,
+# verbs, prepositions, and attribute/predicate words. When extracting a name we
+# stop at these so we never capture into the predicate of the sentence (Bug D:
+# "CI/CD Agent output" must yield "CI/CD", not "CI/CD Agent output").
+_NAME_STOP_WORDS = {
+    # determiners / pronouns / fillers
+    "the", "a", "an", "this", "that", "these", "those", "any", "some", "my",
+    "our", "your", "their", "its", "it", "i", "we", "you", "they", "me",
+    "anything", "something", "someone", "please", "just", "really",
+    # question words
+    "what", "which", "who", "whom", "whose", "how", "when", "where", "why",
+    # verbs / auxiliaries
+    "do", "does", "did", "is", "are", "am", "was", "were", "be", "been", "being",
+    "have", "has", "had", "can", "could", "would", "should", "will", "shall",
+    "may", "might", "must", "need", "needs", "want", "wants", "looking", "look",
+    "find", "get", "use", "using", "make", "build", "create", "tell", "show",
+    "give", "recommend", "suggest", "call", "called", "name", "named", "help",
+    # prepositions / conjunctions
+    "for", "to", "of", "about", "with", "from", "in", "on", "at", "by", "as",
+    "and", "or", "but", "there", "here",
+    # attribute / predicate words (Bug D)
+    "output", "outputs", "input", "inputs", "produce", "produces", "return",
+    "returns", "require", "requires", "support", "supports", "trigger",
+    "triggers", "deploy", "deployment", "handle", "handles", "provide",
+    "provides", "run", "runs", "work", "works", "cost", "costs",
+}
+
+# A name token: letters/digits and the few separators that appear in real names
+# ("CI/CD", "test-data", "R&D", "v2.0"). Used both to detect and to trim names.
+_NAME_TOKEN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9/&.+\-]*$")
+
+# Bare autonomy-level tokens are filter directives, never an agent name.
+_AUTONOMY_TOKEN_RE = re.compile(r"^[lL][1-4]$")
+
+# Secondary (Bug 1): a capitalized *capability* noun phrase that names a thing
+# without the word "Agent" — e.g. "Performance testing", "Load testing", "Visual
+# regression testing", "Chaos engineering". The first token must be Title-/UPPER-
+# case and >= 4 chars (so short acronyms like "UI" don't trip it); the second
+# token may be lowercase ("testing").
+_CAP_PHRASE_RE = re.compile(r"\b([A-Z][A-Za-z]{3,})\s+([A-Za-z]+)\b")
+
+# First words that are ordinary sentence/verb words, not capability nouns.
+_COMMON_PHRASE_WORDS = {
+    "what", "which", "where", "when", "who", "how", "why", "does", "do", "is",
+    "are", "can", "could", "would", "should", "tell", "describe", "explain",
+    "show", "give", "find", "make", "build", "create", "automate", "generate",
+    "recommend", "suggest", "help", "want", "need", "looking", "please", "the",
+    "this", "that", "there", "here", "your", "our", "with", "from", "have",
+    "get", "use", "run", "let", "about", "into", "test", "tests", "testing",
+    "agent", "agents",
+}
+
+# Second words that can't be a noun-phrase tail: articles/prepositions plus the
+# predicate words above (so "Generator output" / "Agent output" never fire).
+_SECOND_STOPWORDS = {
+    "the", "a", "an", "me", "is", "are", "to", "of", "do", "does", "it", "you",
+    "with", "for", "that", "this", "my", "our", "your", "and", "or", "in",
+    "on", "at", "output", "outputs", "input", "inputs", "produce", "produces",
+    "return", "returns", "require", "requires", "support", "supports",
+    "trigger", "triggers", "deploy", "use", "handle", "handles", "give",
+    "gives", "provide", "provides",
+}
+
+# "called/named (the) X" — capture the region after the verb (Bug B).
+_CALLED_RE = re.compile(
+    r"\b(?:called|named)\s+(?:the\s+|a\s+|an\s+)?(?P<region>[A-Za-z0-9/&.\- ]+)",
+    re.IGNORECASE,
+)
+
+
+def _is_meaningful_name(name: str) -> bool:
+    """True if ``name`` is a plausible agent name (not blank / not an L-level)."""
+    name = (name or "").strip()
+    if len(name) < 2:
+        return False
+    if _AUTONOMY_TOKEN_RE.match(name):
+        return False
+    return any(ch.isalnum() for ch in name)
+
+
+def _tail_name(pre: str) -> str:
+    """Extract the agent name sitting at the *end* of ``pre`` (the text just
+    before the word "Agent"), walking right-to-left and stopping at the first
+    boundary word. e.g. "what does the CI/CD" -> "CI/CD"."""
+    tokens = pre.split()
+    collected: list[str] = []
+    for tok in reversed(tokens):
+        clean = tok.strip(".,;:?!\"'()[]")
+        if not clean:
+            break
+        if clean.casefold() in _NAME_STOP_WORDS:
+            break
+        if not _NAME_TOKEN_RE.match(clean):
+            break
+        collected.append(clean)
+    return " ".join(reversed(collected)).strip()
+
+
+def _lead_name(region: str) -> str:
+    """Extract a name from the *start* of ``region`` (text after "called"),
+    stopping at the first boundary word and dropping a trailing "agent"."""
+    collected: list[str] = []
+    for tok in region.split():
+        clean = tok.strip(".,;:?!\"'()[]")
+        if not clean or clean.casefold() in _NAME_STOP_WORDS:
+            break
+        if not _NAME_TOKEN_RE.match(clean):
+            break
+        collected.append(clean)
+    while collected and collected[-1].casefold() in {"agent", "agents"}:
+        collected.pop()
+    return " ".join(collected).strip()
+
+# Phrasings that ask for the nearest available alternative.
+_ASKS_CLOSEST_RE = re.compile(
+    r"\b(closest|nearest|similar|alternativ\w*|anything (?:like|similar|else)"
+    r"|something (?:like|similar)|close to|instead)\b",
+    re.IGNORECASE,
+)
+
+
+@lru_cache(maxsize=1)
+def _catalog_vocab() -> tuple[str, ...]:
+    """Casefolded agent names + tags (hyphens normalized to spaces), for the
+    substring guard that keeps the capability check from firing on real agents."""
+    entries: list[str] = []
+    try:
+        agents = load_agents(config.AGENTS_DIR)
+    except Exception:  # pragma: no cover - catalog unreadable -> no guard
+        agents = []
+    for agent in agents:
+        name = agent.name.casefold()
+        entries.append(name)
+        entries.append(name.replace("-", " "))
+        for tag in agent.tags:
+            t = str(tag).casefold()
+            entries.append(t)
+            entries.append(t.replace("-", " "))
+    return tuple(entries)
+
+
+def _detect_uncataloged_capability(text: str) -> str | None:
+    """Return a capability-style phrase not present in the catalog, or ``None``."""
+    for match in _CAP_PHRASE_RE.finditer(text):
+        first, second = match.group(1), match.group(2)
+        if first.casefold() in _COMMON_PHRASE_WORDS:
+            continue
+        # The tail of a capability noun phrase can't be an article, preposition,
+        # verb, or predicate word ("Analyser need", "Generator output").
+        if second.casefold() in _SECOND_STOPWORDS or second.casefold() in _NAME_STOP_WORDS:
+            continue
+        phrase = f"{first} {second}"
+        low = phrase.casefold()
+        if any(low in entry for entry in _catalog_vocab()):
+            continue  # it's part of a real agent name/tag -> normal path
+        return phrase
+    return None
+
+
+def asks_for_closest(query: str) -> bool:
+    """Whether the query asks for the nearest available alternative."""
+    return bool(_ASKS_CLOSEST_RE.search(query or ""))
+
+
+def _looks_like_specific_agent_request(query: str) -> str | None:
+    """Return the unrecognized agent/capability the user seems to want, else
+    ``None``.
+
+    Detects when a query names a *specific* agent — explicitly ("... X Agent",
+    "anything called the X", "I need the X agent") or as a capability noun phrase
+    ("Performance testing") — that isn't in the live catalog. If the named thing
+    **is** in the catalog, the normal path should run, so this returns ``None``.
+    This is the recommendation-path analogue of the info path's grounding gate:
+    we'd rather say "that agent may not exist yet" than recommend a
+    loosely-similar agent, answer about the wrong one, or emit a generic no-match.
+    """
+    text = query or ""
+
+    # 1) "... <name> agent(s) ..." — the name is the tokens immediately before
+    #    the word "agent", trimmed at the first boundary word (Bugs B, C1, D).
+    match = re.search(r"\b[Aa]gents?\b", text)
+    if match:
+        name = _tail_name(text[: match.start()])
+        if name:
+            if router.agent_exists(name):
+                return None  # a real catalog agent was named -> normal path
+            if _is_meaningful_name(name):
+                return name
+            # otherwise (e.g. a bare "L1") fall through to the checks below
+
+    # 2) "called/named (the) X" with no trailing "Agent" word.
+    called = _CALLED_RE.search(text)
+    if called:
+        name = _lead_name(called.group("region"))
+        if name:
+            if router.agent_exists(name):
+                return None
+            if _is_meaningful_name(name):
+                return name
+
+    # 3) Capability noun phrase ("Performance testing") with no "agent" word.
+    return _detect_uncataloged_capability(text)
+
+
+def _catalog_agent_names() -> list[str]:
+    """Display names of every agent in the live catalog (empty if unreadable)."""
+    try:
+        return [agent.name for agent in load_agents(config.AGENTS_DIR)]
+    except Exception:  # pragma: no cover - catalog unreadable -> no list
+        return []
+
+
+def _not_in_catalog_message(name: str, closest: Hit | None = None) -> str:
+    """Honest "that agent isn't here" reply, listing what *is* available and,
+    when asked, the closest available alternative."""
+    msg = (
+        f"I don't have an agent called '{name}' in the catalog. "
+        "It may be in development or not yet added. "
+        "Here's what's currently available:"
+    )
+    names = _catalog_agent_names()
+    if names:
+        msg += "\n\n" + "\n".join(f"- {n}" for n in names)
+    if closest is not None:
+        snippet = _overview_snippet(closest)
+        if snippet:
+            msg += f"\n\nThe closest agent we have is **{closest.name}**: {snippet}"
+        else:
+            msg += f"\n\nThe closest agent we have is **{closest.name}**."
+    return msg
+
+
+# ---------------------------------------------------------------------------
 # Recommendation
 # ---------------------------------------------------------------------------
 
@@ -87,6 +325,26 @@ def recommend(
     log.info("RECOMMENDATION PATH STARTED")
     k = k or config.RECOMMEND_TOP_K
     search_fn = search_fn or search_agents
+
+    # Grounding gate: if the user names a specific agent/capability that isn't in
+    # the catalog, say so honestly *before* retrieval rather than recommending a
+    # loosely-similar agent or emitting a generic no-match. When they ask for the
+    # closest alternative, surface the top semantic match (if it clears the floor).
+    missing = _looks_like_specific_agent_request(query)
+    if missing:
+        closest = None
+        if asks_for_closest(query):
+            hits = search_fn(query, k=k, where=None)
+            if hits and hits[0].score >= config.NO_MATCH_SCORE:
+                closest = hits[0]
+        log.info("DECISION: requested agent not in catalog — %s", missing)
+        return {
+            "agents": [],
+            "explanation": _not_in_catalog_message(missing, closest),
+            "ambiguous": False,
+            "not_in_catalog": True,
+        }
+
     where = detect_filter(query)
     log.info("FILTER DETECTED: %s", where or "none")
     hits = search_fn(query, k=k, where=where)

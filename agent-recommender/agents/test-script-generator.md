@@ -1,54 +1,47 @@
 ---
 agent_id: test-script-generator
-name: Test Script Generator Agent
-domain: testing
-tags: [ui-automation, test-scripts, browser, self-healing, test-report]
+name: Test Script Generator (Playwright MCP)
+domain: automation
+tags: [playwright, script-generation, e2e, mcp, web-testing, self-healing, pipeline]
 autonomy_default: L4
 autonomy_supported: [L4]
-triggers: [manual]
+triggers: [manual, api]
 ---
 
 ## Overview
-The Test Script Generator takes a live application URL and produces ready-to-run UI
-automation test scripts. You describe what you want to test — or upload your existing
-manual test cases — and the agent opens a real browser, explores the application,
-writes the test scripts, runs them, and automatically fixes any failures before
-delivering the final output.
+Generates end-to-end Playwright TypeScript test scripts from a target URL using a four-agent linear pipeline: Clarifier (collects user story or action sequence from the user), Planner (produces a structured test plan), Generator (writes Playwright TypeScript code via the Playwright MCP tool), and Healer (re-runs failing scripts and auto-heals locator errors). No HITL gates — the pipeline runs to completion and surfaces results as a test plan markdown document, a code viewer, and a test execution report. Approximately 85% of the workflow is autonomous; the user provides a target URL and optionally a user story or description of what to test. The agent requires the Playwright MCP server to be running and accessible.
 
 ## Autonomy Level
 L4 · Collaborative (~15% human control).
 
-The agent drives the full explore → write → run → heal cycle on its own, with only a
-small amount of human control.
+The only user input is the initial `targetUrl` and optional action description. The pipeline runs fully autonomously thereafter — Clarifier may ask one clarifying question before passing to Planner if the scope is ambiguous. The Healer runs up to 3 self-correction rounds on failing scripts before exiting.
 
 ## Inputs
 | Input | Required | Description |
 |-------|----------|-------------|
-| Target URL | Yes | The live application URL the agent opens and tests against |
-| Description | No | Describe the features or user flows you want automated |
-| Test Cases File | No | Upload an Excel (.xlsx) or CSV file of pre-written manual test cases — the agent automates every scenario in it |
-| Max Heal Attempts | No | How many fix-and-retry cycles to run if tests fail (default: 3) |
-
-> Only the Target URL is required. If you upload test cases without a description,
-> the agent works from the file content alone.
+| Target URL | Yes | The web application URL to generate tests for |
+| User Story / Action Sequence | No | Description of the user journey to test; Clarifier derives one from the URL if omitted |
+| Project | Yes | Scopes script versioning and MCP server context |
 
 ## Outputs
 | Output | Description |
 |--------|-------------|
-| Test Plan | A structured document describing which flows will be tested, the steps, and expected outcomes — produced before any scripts are written |
-| Test Scripts | Automation test files ready to run, one per scenario group (or a single file if requested) |
-| Test Report | Pass/fail results per test across all heal attempts, with screenshots and a final status: pass / partial / fail |
+| Test Plan | Structured markdown describing the scenarios to be automated |
+| Code Viewer | Generated (and healed) Playwright TypeScript test files |
+| Test Report | Per-test results from the final script execution, with pass/fail status and error details |
 
 ## Triggers
 | Trigger | Description |
 |---------|-------------|
-| Manual | Provide a URL and description directly in the workspace |
+| Manual | Provide a target URL in the workspace; optionally describe the actions to test |
+| API | Submit the target URL and optional user story programmatically |
 
 ## Deployment
-**Hardware:** 4 vCPU, 8 GB RAM, and ~10 GB free disk for browser binaries, screenshots, and run artifacts. A GPU is not required.
-**Software:** Linux or Windows host with Python 3.11+, a Chromium-based browser driven via Playwright, and (optionally) Docker for sandboxed runs. Outbound network access to the target application URL is required.
+**Hardware:** 2 vCPU, 4 GB RAM; no GPU required.
+**Software:** Python 3.11+, LangGraph 1.0+, Node.js 18+, Playwright MCP server (`@playwright/mcp`), browser binaries (`npx playwright install`).
 
 ## Limitations
-- Tests web UIs that are reachable from the agent host; native desktop and mobile apps are out of scope (see the Mobile App Tester Agent for those).
-- Highly dynamic single-page apps may need a higher Max Heal Attempts value before scripts stabilise.
-- Cannot complete authentication flows that require external MFA or hardware tokens.
+- Requires the Playwright MCP server to be running and accessible on the configured MCP socket; the Generator agent will fail without it.
+- Generated scripts target the exact URL provided; dynamic URLs (SSO-gated, IP-restricted, or ephemeral environments) must be accessible from the agent host.
+- The Healer repairs locator errors and element-not-found failures; logical test failures (wrong assertions) require manual correction.
+- Self-healing is bounded at 3 rounds per script; persistently failing tests exit with a partial pass/fail report.

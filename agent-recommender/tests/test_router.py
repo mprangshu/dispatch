@@ -48,7 +48,7 @@ def test_detect_intent(message, expected):
         "What is the User Story Analyser?",
         "Tell me about Test Data Provisioning",
         "Describe the Test Script Generator",
-        "What's SmartTDM AgenticDC?",
+        "What's the Data Coverage Agent?",
     ],
 )
 def test_definitional_question_about_named_agent_is_info(message):
@@ -61,7 +61,7 @@ def test_definitional_question_about_named_agent_is_info(message):
         ("What does Test Data Provisioning output?", "test-data-provisioning"),
         ("autonomy level of the User Story Analyser", "user-story-analyser"),
         ("inputs to the Test Script Generator Agent", "test-script-generator"),
-        ("tell me about smarttdm-agenticdc", "smarttdm-agenticdc"),
+        ("tell me about the Data Coverage Agent", "data-coverage"),
         # No agent named -> None (a cross-catalog ask, not a lookup).
         ("which agents are fully autonomous", None),
         ("I need to automate UI tests from a live URL", None),

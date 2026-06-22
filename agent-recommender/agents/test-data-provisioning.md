@@ -2,58 +2,46 @@
 agent_id: test-data-provisioning
 name: Test Data Provisioning
 domain: testing
-tags: [test-data, provisioning, synthetic-data, tdr, export]
+tags: [test-data, provisioning, neo4j, hsqldb, synthetic-data, data-mining, knowledge-graph]
 autonomy_default: L2
 autonomy_supported: [L1, L2, L3]
-triggers: [manual, api]
+triggers: [manual, api, webhook]
 ---
 
 ## Overview
-Given a User Story ID, this agent provisions ready-to-use test data for the
-associated test cases. It:
-
-- Discovers all test cases linked to the user story.
-- Identifies the test data fields each test case needs (via an LLM, or from
-  existing knowledge graph metadata).
-- Lets the user confirm/edit the fields and their filter criteria.
-- Mines real test data from the Test Data Repository (TDR) and generates
-  synthetic data for any new fields.
-- Exports the final dataset as CSV or JSON.
+Given a User Story ID, discovers all associated test cases from the Neo4j knowledge graph, identifies the test data fields required per test case (via LLM or existing KG metadata), mines real data from a HSQLDB Test Data Repository, generates synthetic data for fields with no real source, and exports the final provisioned dataset as CSV or JSON. The agent iterates through each test case with three HITL checkpoints: field selection and filter confirmation, save-config decision, and continue-or-download choice. PII is scrubbed from all mined data before display.
 
 ## Autonomy Level
-L2 (default) · Supported: L1, L2, L3.
+L2 · Supervised (default).
 
-| Level | Behaviour |
-|-------|-----------|
-| L1 | Fields identified; user confirms all details manually. |
-| L2 | Fields auto-identified; user confirms selection; data mining runs automatically. |
-| L3 | End-to-end, including saving the configuration to the knowledge graph if approved. |
+Three HITL checkpoints per test case: the user reviews and selects identified data fields (with optional filter edits), decides whether to save the field configuration for future use, and chooses whether to continue to the next test case or download now.
 
 ## Inputs
 | Input | Required | Description |
 |-------|----------|-------------|
-| User Story ID | Yes | Identifies the story whose linked test cases need data |
-| Autonomy level | Yes | Which level to run at: L1, L2, or L3 |
-| User confirmations | Yes | In-run choices: field selection, save-config choice, and continue-or-download choice |
+| User Story ID | Yes | Identifier to look up associated test cases in the Neo4j knowledge graph |
+| Project | Yes | Scopes KG namespace, TDR connection, and data persistence |
 
 ## Outputs
 | Output | Description |
 |--------|-------------|
-| Test dataset | A provisioned dataset (mined + synthetic data merged) for each test case |
-| Export file | The dataset as a downloadable CSV or JSON file |
-| Saved configuration | Optionally, the test configuration (fields/schema) stored against the test case for future reuse |
+| Test Case Accordion | List of discovered test cases from the knowledge graph, shown before data mining begins |
+| Test Data Table | Mined and generated data rows per test case, shown for review after each mining cycle |
+| Download Package | Final provisioned dataset exported as CSV and/or JSON, available for download |
 
 ## Triggers
 | Trigger | Description |
 |---------|-------------|
-| Manual | Start a run from the workspace by entering a User Story ID and autonomy level |
-| API | Kick off provisioning programmatically by posting a User Story ID to the run endpoint |
+| Manual | Enter a User Story ID in the workspace |
+| API | Submit a User Story ID programmatically (planned) |
+| Webhook | Triggered when test cases are linked to a user story (planned) |
 
 ## Deployment
-**Hardware:** 2 vCPU, 4 GB RAM, and ~20 GB free disk for mined and generated datasets.
-**Software:** Python 3.11+ with ODBC/JDBC drivers for the Test Data Repository (TDR), network access to the TDR and the knowledge graph, and LLM API access for field identification.
+**Hardware:** 2 vCPU, 4 GB RAM; JVM required for HSQLDB JDBC access.
+**Software:** Python 3.11+, Java 11+ (JVM for jaydebeapi/JPype1 JDBC bridge), HSQLDB Test Data Repository access, Neo4j connection for knowledge graph.
 
 ## Limitations
-- Synthetic-data quality depends on TDR coverage; the agent cannot mine data for fields that have no example or governing rule.
-- Bound by the source database's access permissions — it never reads tables it isn't granted.
-- Export is limited to CSV and JSON; other formats are out of scope.
+- Requires an accessible HSQLDB Test Data Repository for real data mining; falls back to synthetic generation only when the TDR is unreachable.
+- PII is scrubbed from mined data before display; production data sources must be configured with appropriate access controls.
+- The knowledge graph must contain test case metadata for the given User Story ID; sparse graphs yield fewer or no test cases.
+- JVM startup via JPype1 adds a cold-start delay on first run.

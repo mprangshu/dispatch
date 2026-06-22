@@ -45,10 +45,12 @@ def test_recommendation_query_returns_expected_agent(built_store):
 
 
 def test_metadata_filter_scopes_results(built_store):
-    # "fully autonomous" implies autonomy_default == L4 -> only the L4 agent.
-    hits = search_agents("fully autonomous agents", k=5, where={"autonomy_default": "L4"})
-    assert hits, "filter should still return the matching agent"
-    assert {h.agent_id for h in hits} == {"test-script-generator"}
+    # "fully autonomous" implies autonomy_default == L4. The catalog now has
+    # several L4 agents, so assert the filter scopes results to *only* L4 agents
+    # (and that a known L4 agent is among them), not a single fixed agent.
+    hits = search_agents("fully autonomous agents", k=20, where={"autonomy_default": "L4"})
+    assert hits, "filter should still return the matching agents"
+    assert "test-script-generator" in {h.agent_id for h in hits}
     assert all(h.metadata.get("autonomy_default") == "L4" for h in hits)
 
 
@@ -82,7 +84,7 @@ def test_list_frontmatter_flattened_into_scalar_metadata(built_store):
     assert "synthetic-data" in meta["tags"]
     assert meta["autonomy_supported"] == "L1, L2, L3"
     # Populated triggers -> comma-joined string plus the "specified" flag (section 8).
-    assert meta["triggers"] == "manual, api"
+    assert meta["triggers"] == "manual, api, webhook"
     assert meta["triggers_specified"] is True
 
 

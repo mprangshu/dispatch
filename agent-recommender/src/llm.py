@@ -21,6 +21,14 @@ from .logger import get_logger
 
 log = get_logger(__name__)
 
+# Inject the Windows certificate store so httpx trusts the Cognizant Zscaler
+# proxy CA without needing SSL_CERT_FILE or a custom CA bundle.
+try:
+    import truststore
+    truststore.inject_into_ssl()
+except Exception:
+    pass
+
 # Load .env so GEMINI_API_KEY is available without exporting it manually.
 try:  # python-dotenv is a declared dependency, but don't hard-fail without it.
     from dotenv import load_dotenv
@@ -84,5 +92,5 @@ def generate(prompt: str, system: str | None = None, model: str | None = None) -
         log.info("LLM RESULT: %s", text[:150] if text else "None — fallback")
         return text or None
     except Exception:  # pragma: no cover - network/quota/parse errors -> fall back
-        log.info("LLM RESULT: None — fallback")
+        log.exception("LLM RESULT: None — fallback (exception below)")
         return None

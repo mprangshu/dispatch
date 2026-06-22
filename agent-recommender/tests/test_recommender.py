@@ -75,8 +75,11 @@ def test_detect_filter(query, expected):
 
 def test_clear_single_match(built_store):
     res = recommend("I need to automate UI tests from a live URL", use_llm=False)
-    assert res["ambiguous"] is False
-    assert [h.agent_id for h in res["agents"]] == ["test-script-generator"]
+    ids = [h.agent_id for h in res["agents"]]
+    # test-script-generator is the best fit. (The catalog now has sibling
+    # script-generation agents, so the result may be a shortlist; assert it leads
+    # the recommendation rather than demanding a lone pick.)
+    assert ids and ids[0] == "test-script-generator"
     assert "Test Script Generator" in res["explanation"]
 
 
@@ -86,9 +89,10 @@ def test_clear_single_match(built_store):
 
 
 def test_metadata_filtered_query(built_store):
-    # "fully autonomous" -> autonomy_default == L4 -> only the L4 agent.
+    # "fully autonomous" -> autonomy_default == L4. Several agents qualify now, so
+    # assert the filter scopes the recommendation to L4 agents only.
     res = recommend("which agents are fully autonomous", use_llm=False)
-    assert {h.agent_id for h in res["agents"]} == {"test-script-generator"}
+    assert res["agents"], "the L4 filter should match at least one agent"
     assert all(h.metadata.get("autonomy_default") == "L4" for h in res["agents"])
 
 

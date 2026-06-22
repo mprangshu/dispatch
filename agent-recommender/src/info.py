@@ -31,10 +31,11 @@ from __future__ import annotations
 import re
 from typing import Callable
 
+from . import recommender
 from .llm import generate
 from .logger import get_logger
 from .retriever import Hit, search_sections
-from .router import find_agent
+from .router import agent_exists, find_agent
 
 log = get_logger(__name__)
 
@@ -203,7 +204,27 @@ def answer_question(
     k = k or INFO_TOP_K
     search_fn = search_fn or search_sections
 
+    # Not-in-catalog gate (Bug 3): if the question names a specific agent that
+    # isn't in the catalog, answer honestly and never retrieve — otherwise a
+    # stray name token could pull section text from an unrelated agent and we'd
+    # answer about the wrong one. No agent list here (it could surface the very
+    # name fragment the user typed); the recommendation path owns the listing.
+    missing = recommender._looks_like_specific_agent_request(query)
+    if missing:
+        log.info("AGENT NOT IN CATALOG: %s — answering honestly without retrieval", missing)
+        return {
+            "answer": (
+                f"I don't have an agent called '{missing}' in the catalog. "
+                "It may be in development or not yet added."
+            ),
+            "sources": [],
+            "grounded": False,
+        }
+
     agent_id = find_agent(query)
+    # Defensive: only trust a find_agent hit that really exists in the catalog.
+    if agent_id and not agent_exists(agent_id):
+        agent_id = None
     log.info("AGENT IDENTIFIED: %s", agent_id or "none — using retrieval")
     section = detect_section(query)
     log.info("SECTION TARGETED: %s", section or "none")

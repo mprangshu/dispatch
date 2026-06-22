@@ -51,12 +51,35 @@ class Agent:
         """Concise text used later as the agent-summary embedding record.
 
         Combines name + Overview section + tags, per the recommendation-path
-        record described in PROBLEM_STATEMENT.md section 4.1.
+        record described in PROBLEM_STATEMENT.md section 4.1. If the Overview is
+        empty or a ``TBD``/"not specified" placeholder, fall back to the first
+        non-empty section so the agent is still embeddable and findable (Bug C2)
+        rather than collapsing to just its name.
         """
         parts = [self.name]
         overview = self.get_section("Overview")
-        if overview:
+        if not _section_is_blank(overview):
             parts.append(overview.strip())
+        else:
+            for header, body in self.sections.items():
+                if header.strip().casefold() == "overview":
+                    continue
+                if not _section_is_blank(body):
+                    parts.append(body.strip())
+                    break
         if self.tags:
             parts.append("Tags: " + ", ".join(self.tags))
         return "\n\n".join(parts)
+
+
+_BLANK_SECTION_VALUES = {
+    "", "tbd", "n/a", "na", "none", "not specified",
+    "not specified in source", "not available",
+}
+
+
+def _section_is_blank(body: str | None) -> bool:
+    """True when a section body is missing/empty or a known placeholder."""
+    if not body:
+        return True
+    return body.strip().casefold() in _BLANK_SECTION_VALUES
