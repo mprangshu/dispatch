@@ -304,3 +304,105 @@ def test_real_agent_output_question_does_not_fire():
     assert rec._looks_like_specific_agent_request(
         "What does the Test Script Generator output?"
     ) is None
+
+
+# ---------------------------------------------------------------------------
+# Catalog-browse requests must NOT trip the gate (false-positive fix)
+# ---------------------------------------------------------------------------
+
+_BROWSE_QUERIES = [
+    "List all the agents",
+    "Show me all agents",
+    "What agents do you have?",
+    "Which agents are available?",
+    "Show all available agents",
+]
+
+
+@pytest.mark.parametrize("query", _BROWSE_QUERIES)
+def test_catalog_browse_lists_catalog_not_gate(query):
+    reply = handle(query, use_llm=False)
+    low = reply.lower()
+    # The not-in-catalog message must NOT appear.
+    assert "not in catalog" not in low
+    assert "don't have an agent called" not in low
+    assert "development" not in low
+    # The reply actually lists the catalog (at least one real agent name).
+    names = [a.name for a in router.load_agents(router.config.AGENTS_DIR)]
+    assert names and any(name in reply for name in names)
+
+
+@pytest.mark.parametrize("query", _BROWSE_QUERIES)
+def test_browse_request_is_detected(query):
+    assert rec.is_catalog_browse_request(query) is True
+
+
+@pytest.mark.parametrize("query", _BROWSE_QUERIES)
+def test_browse_request_does_not_fire_the_gate(query):
+    # Defense-in-depth: even the raw gate must not extract a name from a browse.
+    assert rec._looks_like_specific_agent_request(query) is None
+
+
+# ---------------------------------------------------------------------------
+# The gate must STILL fire for genuinely non-catalog named agents
+# ---------------------------------------------------------------------------
+
+
+def test_gate_still_fires_for_unknown_named_agents():
+    assert rec._looks_like_specific_agent_request("Is there a Performance Testing Agent?") is not None
+    assert rec._looks_like_specific_agent_request("I need the Load Testing Agent") is not None
+    # ...and neither is mistaken for a catalog-browse request.
+    assert rec.is_catalog_browse_request("Is there a Performance Testing Agent?") is False
+    assert rec.is_catalog_browse_request("I need the Load Testing Agent") is False
+
+
+def test_filtered_query_is_not_treated_as_browse():
+    # "which agents are fully autonomous" implies an L4 filter -> recommend, not browse.
+    assert rec.is_catalog_browse_request("which agents are fully autonomous") is False
+
+
+# ---------------------------------------------------------------------------
+# Reversed phrasing: "agent for X" / "agent that does X" (false-negative fix)
+# ---------------------------------------------------------------------------
+
+_AGENT_FOR_FIRE = [
+    "Is there a agent for performance testing?",
+    "Do you have an agent for load testing?",
+    "Is there an agent that does chaos engineering?",
+    "Is there an agent to handle visual regression?",
+    "Do you have an agent for API contract validation?",
+]
+
+
+@pytest.mark.parametrize("query", _AGENT_FOR_FIRE)
+def test_agent_for_phrasing_fires_gate(query):
+    # The named capability isn't in the catalog -> the gate must fire.
+    assert rec._looks_like_specific_agent_request(query) is not None
+    # ...and it's not mistaken for a catalog-browse request.
+    assert rec.is_catalog_browse_request(query) is False
+
+
+def test_agent_for_phrasing_returns_not_in_catalog_no_shortlist():
+    res = recommend("Is there a agent for performance testing?", use_llm=False)
+    assert res["not_in_catalog"] is True
+    assert res["agents"] == []  # a specific named request -> NOT a shortlist
+    low = res["explanation"].lower()
+    assert "not in catalog" in low or "development" in low
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Is there an agent for test data provisioning?",
+        "Do you have an agent for defect triaging?",
+    ],
+)
+def test_agent_for_real_agent_does_not_fire(query):
+    # The named capability IS a real agent -> normal path (gate stays quiet).
+    assert rec._looks_like_specific_agent_request(query) is None
+
+
+def test_agent_for_grammar_typo_is_equivalent():
+    # "a agent" (missing the 'n') must behave exactly like "an agent".
+    assert rec._looks_like_specific_agent_request("Is there a agent for performance testing?") is not None
+    assert rec._looks_like_specific_agent_request("Is there an agent for performance testing?") is not None

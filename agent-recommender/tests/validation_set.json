@@ -1,0 +1,110 @@
+[
+  {
+    "id": "rec-01",
+    "type": "recommend",
+    "query": "I need to automate UI tests from a live URL",
+    "expected_agent_id": "test-script-generator",
+    "expected_keywords": ["Test Script Generator"],
+    "should_be_grounded": null,
+    "note": "UI automation from a URL -> Playwright Test Script Generator."
+  },
+  {
+    "id": "rec-02",
+    "type": "recommend",
+    "query": "Generate synthetic test data for my test cases from a knowledge graph",
+    "expected_agent_id": "test-data-provisioning",
+    "expected_keywords": ["Test Data Provisioning"],
+    "should_be_grounded": null,
+    "note": "Synthetic data + knowledge graph -> Test Data Provisioning (tags: synthetic-data, neo4j)."
+  },
+  {
+    "id": "rec-03",
+    "type": "recommend",
+    "query": "Fix a badly written user story and produce acceptance criteria",
+    "expected_agent_id": "user-story-analyser",
+    "expected_keywords": ["User Story Analyser"],
+    "should_be_grounded": null,
+    "note": "Story refinement + acceptance criteria -> User Story Analyser (overview matches directly)."
+  },
+  {
+    "id": "rec-04",
+    "type": "recommend",
+    "query": "Which fully autonomous agent generates end-to-end browser test scripts?",
+    "expected_agent_id": "test-script-generator",
+    "expected_keywords": ["Test Script Generator"],
+    "should_be_grounded": null,
+    "note": "Exercises the 'fully autonomous' -> L4 metadata filter; among L4 agents the Playwright e2e generator wins."
+  },
+  {
+    "id": "info-01",
+    "type": "info",
+    "query": "What are the inputs to Test Data Provisioning?",
+    "expected_agent_id": "test-data-provisioning",
+    "expected_keywords": ["User Story ID"],
+    "should_be_grounded": true,
+    "note": "Inputs table first row is 'User Story ID'."
+  },
+  {
+    "id": "info-02",
+    "type": "info",
+    "query": "What does the Test Script Generator output?",
+    "expected_agent_id": "test-script-generator",
+    "expected_keywords": ["Test Plan", "Code Viewer", "Test Report"],
+    "should_be_grounded": true,
+    "note": "Real Outputs section: Test Plan, Code Viewer, Test Report (NOT 'Test Scripts')."
+  },
+  {
+    "id": "info-03",
+    "type": "info",
+    "query": "What autonomy level does the User Story Analyser support?",
+    "expected_agent_id": "user-story-analyser",
+    "expected_keywords": ["L3"],
+    "should_be_grounded": true,
+    "note": "autonomy_default / Autonomy Level section = L3."
+  },
+  {
+    "id": "info-04",
+    "type": "info",
+    "query": "What hardware does the User Story Analyser need?",
+    "expected_agent_id": "user-story-analyser",
+    "expected_keywords": ["vCPU", "RAM"],
+    "should_be_grounded": true,
+    "note": "Deployment IS filled (2 vCPU, 4 GB RAM) -> grounded, not TBD."
+  },
+  {
+    "id": "nf-01",
+    "type": "info",
+    "query": "What are the inputs to the Performance Testing Agent?",
+    "expected_agent_id": null,
+    "expected_keywords": ["don't have", "catalog", "development"],
+    "should_be_grounded": false,
+    "note": "No such agent -> not-in-catalog grounding gate; never answers about a wrong agent."
+  },
+  {
+    "id": "nf-02",
+    "type": "info",
+    "query": "What does the CI/CD Agent output?",
+    "expected_agent_id": null,
+    "expected_keywords": ["don't have", "catalog"],
+    "should_be_grounded": false,
+    "note": "Non-existent agent named in an info question -> honest, ungrounded reply."
+  },
+  {
+    "id": "clarify-01",
+    "type": "clarify",
+    "query": "help",
+    "expected_agent_id": null,
+    "expected_keywords": ["describe", "ask"],
+    "should_be_grounded": null,
+    "note": "A bare 'help' (one word, no signal) -> clarify reply offering to describe a task or ask about an agent."
+  },
+  {
+    "id": "clarify-02",
+    "type": "clarify",
+    "query": "testing",
+    "expected_agent_id": null,
+    "expected_keywords": [],
+    "should_be_grounded": null,
+    "note": "A single vague word -> clarify; no keyword constraint (any clarify reply passes)."
+  }
+]

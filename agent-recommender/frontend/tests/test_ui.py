@@ -169,6 +169,57 @@ def test_check_health_api_down(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# /feedback
+# ---------------------------------------------------------------------------
+
+
+def test_submit_feedback_posts_payload(monkeypatch):
+    captured = {}
+
+    def fake_post(url, json=None, timeout=None):
+        captured["url"] = url
+        captured["json"] = json
+        return FakeResponse(200, {"saved": True})
+
+    monkeypatch.setattr(api_client.requests, "post", fake_post)
+    res = api_client.submit_feedback(
+        "the query", "the reply", "positive", intent="info", base_url="http://test:8000"
+    )
+    assert res.ok is True
+    assert res.data == {"saved": True}
+    assert captured["url"] == "http://test:8000/feedback"
+    assert captured["json"] == {
+        "message": "the query",
+        "reply": "the reply",
+        "rating": "positive",
+        "intent": "info",
+    }
+
+
+def test_fetch_feedback_summary_normal(monkeypatch):
+    summary = {"total": 2, "positive": 1, "negative": 1, "positive_pct": 50.0, "recent": []}
+
+    def fake_get(url, timeout=None):
+        assert url == "http://test:8000/feedback/summary"
+        return FakeResponse(200, summary)
+
+    monkeypatch.setattr(api_client.requests, "get", fake_get)
+    res = api_client.fetch_feedback_summary(base_url="http://test:8000")
+    assert res.ok is True
+    assert res.data["total"] == 2
+
+
+def test_fetch_feedback_summary_api_down(monkeypatch):
+    def fake_get(url, timeout=None):
+        raise requests.exceptions.ConnectionError()
+
+    monkeypatch.setattr(api_client.requests, "get", fake_get)
+    res = api_client.fetch_feedback_summary()
+    assert res.ok is False
+    assert "not reachable" in res.error
+
+
+# ---------------------------------------------------------------------------
 # URL handling
 # ---------------------------------------------------------------------------
 

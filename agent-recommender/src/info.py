@@ -180,7 +180,8 @@ def _llm_answer(query: str, hits: list[Hit]) -> str | None:
     # The manager explicitly wants to see the exact prompt (logged at INFO).
     log.info("PROMPT SENT TO LLM:")
     log.info(_RULE)
-    log.info(prompt)
+    log.info("[system instruction]\n%s", _SYSTEM)
+    log.info("[user prompt]\n%s", prompt)
     log.info(_RULE)
     response = generate(prompt, system=_SYSTEM)
     log.info("LLM RESPONSE: %s", response if response else "None — using fallback")

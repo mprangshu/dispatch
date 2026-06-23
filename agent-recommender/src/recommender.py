@@ -138,6 +138,45 @@ _SECOND_STOPWORDS = {
     "gives", "provide", "provides",
 }
 
+# Sentence-opening command / question verbs that can NEVER start an agent name.
+# Guards against a capitalised sentence opener being read as a name, e.g.
+# "List all the agents" -> "List all" (a catalog-browse request, not an agent).
+COMMAND_VERBS = {
+    "list", "show", "get", "find", "tell", "give", "display",
+    "fetch", "search", "what", "which", "who", "how", "can",
+    "could", "would", "is", "are", "do", "does", "have", "help",
+}
+
+# Catalog-browsing phrasings — the user wants to see what's available, not a
+# specific agent. These route to the catalog list, never the not-in-catalog gate.
+_CATALOG_BROWSE_RE = re.compile(
+    r"\b(what agents|which agents|all agents|show agents|get agents|list agents"
+    r"|what'?s available|what is available)\b",
+    re.IGNORECASE,
+)
+# A browse verb ("list all", "show me all", ...) that, together with an explicit
+# mention of "agent(s)", is a catalog-browse request.
+_BROWSE_VERB_RE = re.compile(
+    r"\b(list all|list the|show all|show me all|show the|see all|see the)\b",
+    re.IGNORECASE,
+)
+
+
+def is_catalog_browse_request(query: str) -> bool:
+    """Whether the query is a catalog-browse request ("what agents do you have",
+    "list all the agents") rather than a question about a specific agent."""
+    text = query or ""
+    # A query that implies a metadata filter ("which agents are fully autonomous")
+    # is a *filtered recommendation*, not a plain browse — let it through.
+    if detect_filter(text):
+        return False
+    if _CATALOG_BROWSE_RE.search(text):
+        return True
+    if _BROWSE_VERB_RE.search(text) and re.search(r"\bagents?\b", text, re.IGNORECASE):
+        return True
+    return False
+
+
 # "called/named (the) X" — capture the region after the verb (Bug B).
 _CALLED_RE = re.compile(
     r"\b(?:called|named)\s+(?:the\s+|a\s+|an\s+)?(?P<region>[A-Za-z0-9/&.\- ]+)",
@@ -146,11 +185,15 @@ _CALLED_RE = re.compile(
 
 
 def _is_meaningful_name(name: str) -> bool:
-    """True if ``name`` is a plausible agent name (not blank / not an L-level)."""
+    """True if ``name`` is a plausible agent name (not blank, not an L-level, and
+    not led by a command/question verb like "list" or "show")."""
     name = (name or "").strip()
     if len(name) < 2:
         return False
     if _AUTONOMY_TOKEN_RE.match(name):
+        return False
+    tokens = name.split()
+    if tokens and tokens[0].casefold() in COMMAND_VERBS:
         return False
     return any(ch.isalnum() for ch in name)
 
@@ -220,7 +263,9 @@ def _detect_uncataloged_capability(text: str) -> str | None:
     """Return a capability-style phrase not present in the catalog, or ``None``."""
     for match in _CAP_PHRASE_RE.finditer(text):
         first, second = match.group(1), match.group(2)
-        if first.casefold() in _COMMON_PHRASE_WORDS:
+        # A capability noun phrase can't start with a sentence opener / command
+        # verb ("List all", "Show me", "What agents").
+        if first.casefold() in _COMMON_PHRASE_WORDS or first.casefold() in COMMAND_VERBS:
             continue
         # The tail of a capability noun phrase can't be an article, preposition,
         # verb, or predicate word ("Analyser need", "Generator output").
@@ -239,6 +284,16 @@ def asks_for_closest(query: str) -> bool:
     return bool(_ASKS_CLOSEST_RE.search(query or ""))
 
 
+# Reversed phrasing — the capability follows the word "agent" rather than
+# preceding it: "an agent for performance testing", "an agent that does chaos
+# engineering", "an agent to handle visual regression".
+_AGENT_FOR_RE = re.compile(
+    r"agents?\s+(?:for|that\s+does|that\s+handles|to\s+do|to\s+handle|for\s+doing)\s+"
+    r"(?P<name>[a-zA-Z][a-zA-Z\s\-/]{2,30})",
+    re.IGNORECASE,
+)
+
+
 def _looks_like_specific_agent_request(query: str) -> str | None:
     """Return the unrecognized agent/capability the user seems to want, else
     ``None``.
@@ -253,6 +308,11 @@ def _looks_like_specific_agent_request(query: str) -> str | None:
     """
     text = query or ""
 
+    # A catalog-browse request ("list all the agents", "what agents do you have")
+    # names no specific agent — never fire the gate on it.
+    if is_catalog_browse_request(text):
+        return None
+
     # 1) "... <name> agent(s) ..." — the name is the tokens immediately before
     #    the word "agent", trimmed at the first boundary word (Bugs B, C1, D).
     match = re.search(r"\b[Aa]gents?\b", text)
@@ -264,6 +324,18 @@ def _looks_like_specific_agent_request(query: str) -> str | None:
             if _is_meaningful_name(name):
                 return name
             # otherwise (e.g. a bare "L1") fall through to the checks below
+
+    # 1b) Reversed phrasing: "an agent for performance testing", "an agent that
+    #     does chaos engineering", "an agent to handle visual regression" — the
+    #     named capability follows the verb instead of preceding "Agent".
+    rev = _AGENT_FOR_RE.search(text)
+    if rev:
+        name = re.sub(r"\s+", " ", rev.group("name")).strip(" .,;:?!\"'()[]").strip()
+        if name:
+            if router.agent_exists(name):
+                return None  # a real catalog agent/capability -> normal path
+            if _is_meaningful_name(name):
+                return name
 
     # 2) "called/named (the) X" with no trailing "Agent" word.
     called = _CALLED_RE.search(text)
@@ -429,7 +501,8 @@ def _explain_single(query: str, hit: Hit, use_llm: bool) -> str:
         )
         log.info("PROMPT SENT TO LLM:")
         log.info(_RULE)
-        log.info(prompt)
+        log.info("[system instruction]\n%s", _SYSTEM)
+        log.info("[user prompt]\n%s", prompt)
         log.info(_RULE)
         text = generate(prompt, system=_SYSTEM)
         log.info("LLM RESPONSE: %s", text if text else "None — using fallback")
@@ -459,7 +532,8 @@ def _explain_shortlist(query: str, shortlist: list[Hit], use_llm: bool) -> str:
         )
         log.info("PROMPT SENT TO LLM:")
         log.info(_RULE)
-        log.info(prompt)
+        log.info("[system instruction]\n%s", _SYSTEM)
+        log.info("[user prompt]\n%s", prompt)
         log.info(_RULE)
         text = generate(prompt, system=_SYSTEM)
         log.info("LLM RESPONSE: %s", text if text else "None — using fallback")

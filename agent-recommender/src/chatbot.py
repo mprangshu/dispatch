@@ -140,6 +140,16 @@ def handle(message: str, *, use_llm: bool = True) -> str:
         log.info("REPLY: %s", reply)
         return reply
 
+    # Catalog browsing ("list all the agents", "what agents do you have?") — the
+    # user wants to see what's available, not a specific agent. Show the catalog
+    # directly, before the not-in-catalog gate could misread the opening verb as
+    # an agent name ("List all").
+    if recommender.is_catalog_browse_request(text):
+        log.info("INTENT DETECTED: catalog browse")
+        reply = _agent_list_block()
+        log.info("REPLY: %s", reply)
+        return reply
+
     # Intent detection always uses the deterministic router — it's accurate on
     # the catalog's phrasing and costs no API call. ``use_llm`` is reserved for
     # the answer/explanation generation in the paths below, which halves the

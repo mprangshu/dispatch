@@ -18,11 +18,13 @@ CORS is open to all origins so the frontend can call it from the browser.
 
 from __future__ import annotations
 
+from dataclasses import asdict
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from src import config, handle, llm
+from src import config, feedback, handle, llm
 from src.loader import load_agents
 
 app = FastAPI(
@@ -71,6 +73,35 @@ class HealthResponse(BaseModel):
     llm_available: bool
 
 
+class FeedbackRequest(BaseModel):
+    message: str = Field(..., description="The user's original query.")
+    reply: str = Field(..., description="The bot reply being rated.")
+    rating: str = Field(..., description='"positive" or "negative".')
+    intent: str | None = Field(
+        None, description="recommend | info | clarify, if known to the client."
+    )
+
+
+class FeedbackSavedResponse(BaseModel):
+    saved: bool
+
+
+class FeedbackItem(BaseModel):
+    timestamp: str
+    message: str
+    reply: str
+    rating: str
+    intent: str | None = None
+
+
+class FeedbackSummaryResponse(BaseModel):
+    total: int
+    positive: int
+    negative: int
+    positive_pct: float
+    recent: list[FeedbackItem]
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -101,3 +132,30 @@ def agents() -> list[AgentInfo]:
 def health() -> HealthResponse:
     """Liveness check plus whether an LLM key is configured."""
     return HealthResponse(status="ok", llm_available=llm.available())
+
+
+@app.post("/feedback", response_model=FeedbackSavedResponse)
+def submit_feedback(req: FeedbackRequest) -> FeedbackSavedResponse:
+    """Store one thumbs-up / thumbs-down rating for a reply."""
+    entry = feedback.FeedbackEntry(
+        timestamp=feedback.now_iso(),
+        message=req.message,
+        reply=req.reply,
+        rating=req.rating,
+        intent=req.intent,
+    )
+    feedback.save_feedback(entry)
+    return FeedbackSavedResponse(saved=True)
+
+
+@app.get("/feedback/summary", response_model=FeedbackSummaryResponse)
+def get_feedback_summary() -> FeedbackSummaryResponse:
+    """Aggregate ratings: totals, positive %, and the 5 most recent entries."""
+    summary = feedback.feedback_summary()
+    return FeedbackSummaryResponse(
+        total=summary["total"],
+        positive=summary["positive"],
+        negative=summary["negative"],
+        positive_pct=summary["positive_pct"],
+        recent=[FeedbackItem(**asdict(e)) for e in summary["recent"]],
+    )

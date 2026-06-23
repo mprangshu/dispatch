@@ -11,6 +11,7 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
+import src.feedback as feedback
 from api import app
 from src import config, handle, index, llm
 from src.loader import load_agents
@@ -93,6 +94,39 @@ def test_chat_use_llm_defaults_to_true():
     res = client.post("/chat", json={"message": "hi"})
     assert res.status_code == 200
     assert "reply" in res.json()
+
+
+# ---------------------------------------------------------------------------
+# CORS
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# /feedback  and  /feedback/summary
+# ---------------------------------------------------------------------------
+
+
+def test_feedback_post_then_summary(tmp_path, monkeypatch):
+    # Redirect the store to a temp file so the real logs/ is untouched.
+    monkeypatch.setattr(feedback, "FEEDBACK_FILE", tmp_path / "logs" / "feedback.jsonl")
+
+    saved = client.post(
+        "/feedback",
+        json={"message": "Was this useful?", "reply": "Here you go.",
+              "rating": "positive", "intent": "recommend"},
+    )
+    assert saved.status_code == 200
+    assert saved.json() == {"saved": True}
+
+    summary = client.get("/feedback/summary")
+    assert summary.status_code == 200
+    body = summary.json()
+    assert body["total"] == 1
+    assert body["positive"] == 1
+    assert body["negative"] == 0
+    assert body["positive_pct"] == 100.0
+    assert body["recent"][0]["message"] == "Was this useful?"
+    assert body["recent"][0]["rating"] == "positive"
 
 
 # ---------------------------------------------------------------------------

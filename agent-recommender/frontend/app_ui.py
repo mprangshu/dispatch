@@ -39,6 +39,7 @@ def _init_state() -> None:
     st.session_state.setdefault("use_llm", True)
     st.session_state.setdefault("pending_prompt", None)
     st.session_state.setdefault("agents_cache", {})  # base_url -> agents list
+    st.session_state.setdefault("feedback_given", {})  # message index -> rating
 
 
 def _render_sidebar() -> None:
@@ -86,10 +87,40 @@ def _render_sidebar() -> None:
             agent_id = agent.get("agent_id", "")
             st.markdown(f"**{name}**  \n`{agent_id}`")
 
+        # --- Feedback summary (manager view) ----------------------------------
+        with st.expander("📊 Feedback", expanded=False):
+            summary_res = api_client.fetch_feedback_summary(base)
+            if not summary_res.ok:
+                st.caption("Feedback summary unavailable while the backend is down.")
+            else:
+                s = summary_res.data
+                total = s.get("total", 0)
+                st.markdown(f"**Total ratings:** {total}")
+                if total:
+                    pos, neg = s.get("positive", 0), s.get("negative", 0)
+                    pos_pct = s.get("positive_pct", 0.0)
+                    neg_pct = round(100.0 - pos_pct, 1)
+                    st.markdown(f"👍 Positive: {pos} ({pos_pct}%)")
+                    st.markdown(f"👎 Negative: {neg} ({neg_pct}%)")
+                    recent = s.get("recent", [])
+                    if recent:
+                        rows = [
+                            {
+                                "timestamp": e.get("timestamp", ""),
+                                "message": (e.get("message", "")[:40]),
+                                "rating": e.get("rating", ""),
+                            }
+                            for e in reversed(recent)  # newest first
+                        ]
+                        st.dataframe(rows, use_container_width=True, hide_index=True)
+                else:
+                    st.caption("No ratings yet.")
+
         st.divider()
         if st.button("🗑️ Clear chat", use_container_width=True):
             st.session_state.messages = []
             st.session_state.pending_prompt = None
+            st.session_state.feedback_given = {}
             st.rerun()
 
 
@@ -103,10 +134,44 @@ def _render_examples() -> None:
             st.rerun()
 
 
+def _send_feedback(idx: int, msg: dict, rating: str) -> None:
+    """POST the rating, remember it for this message, and confirm via a toast."""
+    res = api_client.submit_feedback(
+        msg.get("query", ""),
+        msg.get("content", ""),
+        rating,
+        intent=msg.get("intent"),  # None when the client doesn't know it
+        base_url=st.session_state.api_base,
+    )
+    if res.ok:
+        st.session_state.feedback_given[idx] = rating
+        st.toast("Thanks for your feedback!", icon="✅")
+    else:
+        st.toast(f"Couldn't save feedback: {res.error}", icon="⚠️")
+
+
+def _render_feedback_buttons(idx: int, msg: dict) -> None:
+    """Render 👍 / 👎 under one assistant reply; collapse to a note once rated."""
+    given = st.session_state.feedback_given.get(idx)
+    if given:
+        st.caption("✅ Thanks for your feedback!")
+        return
+    up, down, _ = st.columns([1, 1, 4])
+    if up.button("👍 Good answer", key=f"fb_up_{idx}"):
+        _send_feedback(idx, msg, "positive")
+        st.rerun()  # redraw this message as rated; chat history is preserved
+    if down.button("👎 Bad answer", key=f"fb_down_{idx}"):
+        _send_feedback(idx, msg, "negative")
+        st.rerun()
+
+
 def _render_history() -> None:
-    for msg in st.session_state.messages:
+    for idx, msg in enumerate(st.session_state.messages):
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
+            # Only successful assistant replies are rateable (not error markers).
+            if msg["role"] == "assistant" and msg.get("feedbackable"):
+                _render_feedback_buttons(idx, msg)
 
 
 def _handle_message(message: str) -> None:
@@ -125,10 +190,19 @@ def _handle_message(message: str) -> None:
         if result.ok:
             reply = result.data or "_(empty reply)_"
             st.markdown(reply)
-            st.session_state.messages.append({"role": "assistant", "content": reply})
+            msg = {
+                "role": "assistant",
+                "content": reply,
+                "query": message,   # remembered so feedback can report the query
+                "feedbackable": True,
+            }
+            st.session_state.messages.append(msg)
+            # Show the 👍 / 👎 buttons immediately under the fresh reply.
+            _render_feedback_buttons(len(st.session_state.messages) - 1, msg)
         else:
             st.error(result.error)
-            # Persist a short marker so the failed turn stays visible in history.
+            # Persist a short marker so the failed turn stays visible in history
+            # (not rateable — feedback is for real answers only).
             st.session_state.messages.append(
                 {"role": "assistant", "content": f"⚠️ {result.error}"}
             )

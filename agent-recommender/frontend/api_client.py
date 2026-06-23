@@ -33,6 +33,7 @@ DEFAULT_BASE_URL = "http://localhost:8000"
 HEALTH_TIMEOUT = (5, 10)   # (connect, read) seconds — health/agents are cheap
 AGENTS_TIMEOUT = (5, 15)
 CHAT_TIMEOUT = (5, 120)    # a cold start + live LLM reply needs headroom
+FEEDBACK_TIMEOUT = (5, 15)  # feedback writes/reads are cheap
 
 
 @dataclass
@@ -119,3 +120,46 @@ def call_chat(
     except ValueError:
         return ApiResult(ok=False, error=f"POST {url} returned invalid JSON.")
     return ApiResult(ok=True, data=payload.get("reply", ""))
+
+
+def submit_feedback(
+    message: str,
+    reply: str,
+    rating: str,
+    *,
+    intent: str | None = None,
+    base_url: str = DEFAULT_BASE_URL,
+) -> ApiResult:
+    """POST /feedback with the rating -> ApiResult(data={"saved": true})."""
+    base = _normalize(base_url)
+    url = f"{base}/feedback"
+    try:
+        resp = requests.post(
+            url,
+            json={"message": message, "reply": reply, "rating": rating, "intent": intent},
+            timeout=FEEDBACK_TIMEOUT,
+        )
+    except requests.exceptions.RequestException:
+        return ApiResult(ok=False, error=_unreachable_msg(base))
+    if resp.status_code != 200:
+        return ApiResult(ok=False, error=_bad_status_msg("POST", url, resp))
+    try:
+        return ApiResult(ok=True, data=resp.json())
+    except ValueError:
+        return ApiResult(ok=False, error=f"POST {url} returned invalid JSON.")
+
+
+def fetch_feedback_summary(base_url: str = DEFAULT_BASE_URL) -> ApiResult:
+    """GET /feedback/summary -> ApiResult(data={total, positive, negative, ...})."""
+    base = _normalize(base_url)
+    url = f"{base}/feedback/summary"
+    try:
+        resp = requests.get(url, timeout=FEEDBACK_TIMEOUT)
+    except requests.exceptions.RequestException:
+        return ApiResult(ok=False, error=_unreachable_msg(base))
+    if resp.status_code != 200:
+        return ApiResult(ok=False, error=_bad_status_msg("GET", url, resp))
+    try:
+        return ApiResult(ok=True, data=resp.json())
+    except ValueError:
+        return ApiResult(ok=False, error=f"GET {url} returned invalid JSON.")
